@@ -1,0 +1,55 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}{{ item.name }} — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="wardrobe" %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content detail-content">
+            <a class="back-link" href="{% url 'wardrobe' %}">← Back to wardrobe</a>
+            <article class="detail-layout">
+                <div class="detail-image">
+                    <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}">
+                </div>
+                <div class="detail-copy">
+                    <p class="eyebrow"><span class="eyebrow-line"></span> {{ item.get_category_display }}</p>
+                    <h1 class="page-title">{{ item.name }}</h1>
+                    <p class="detail-color">{{ item.primary_color }}{% if item.secondary_color %}<span> · </span>{{ item.secondary_color }}{% endif %}</p>
+                    <div class="detail-actions">
+                        <a class="button button-light" href="{% url 'clothing_edit' item.pk %}">Edit details <span aria-hidden="true">↗</span></a>
+                        <form method="post" action="{% url 'clothing_favorite' item.pk %}">
+                            {% csrf_token %}
+                            <button class="button button-outline" type="submit">{% if item.is_favorite %}♥ Favorite{% else %}♡ Add to favorites{% endif %}</button>
+                        </form>
+                    </div>
+                    <dl class="detail-attributes">
+                        <div><dt>Category</dt><dd>{{ item.get_category_display }}</dd></div>
+                        <div><dt>Color</dt><dd>{{ item.primary_color }}{% if item.secondary_color %}, {{ item.secondary_color }}{% endif %}</dd></div>
+                        <div><dt>Pattern</dt><dd>{{ item.get_pattern_display|default:'Not specified' }}</dd></div>
+                        <div><dt>Style</dt><dd>{{ item.get_style_display|default:'Not specified' }}</dd></div>
+                        <div><dt>Fit</dt><dd>{{ item.get_fit_display|default:'Not specified' }}</dd></div>
+                        <div><dt>Material</dt><dd>{{ item.material|default:'Not identified' }}</dd></div>
+                        <div><dt>Occasion</dt><dd>{{ item.occasion|default:'Not specified' }}</dd></div>
+                        <div><dt>Season</dt><dd>{{ item.season|default:'Not specified' }}</dd></div>
+                        <div><dt>Added</dt><dd>{{ item.date_added|date:'F j, Y' }}</dd></div>
+                    </dl>
+                    <form method="post" action="{% url 'clothing_delete' item.pk %}" data-confirm="Remove {{ item.name }} from your wardrobe?">
+                        {% csrf_token %}
+                        <button class="text-link delete-link" type="submit">Remove this piece</button>
+                    </form>
+                </div>
+            </article>
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

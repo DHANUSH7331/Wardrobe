@@ -1,0 +1,88 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}Dashboard — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="dashboard" %}
+
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand">
+                <span class="wordmark-mark">A</span><span>ATELIER</span>
+            </div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user">
+                <span class="status-dot"></span>
+                <span>{{ request.user.username }}</span>
+            </div>
+        </header>
+
+        <section class="dashboard-content">
+            <p class="eyebrow"><span class="eyebrow-line"></span> A fresh start</p>
+            <h1 class="dashboard-title">Your style,<br><em>considered.</em></h1>
+            <p class="dashboard-intro">
+                Welcome in, {{ request.user.username }}. This is your private space to build a wardrobe that works for you.
+            </p>
+
+            <div class="dashboard-stats">
+                <article class="stat-card">
+                    <span class="stat-label">IN YOUR WARDROBE</span>
+                    <strong>{{ item_count }}</strong>
+                    <span class="stat-caption">pieces you own</span>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">YOUR FAVORITES</span>
+                    <strong>{{ favorite_count }}</strong>
+                    <span class="stat-caption">pieces you love most</span>
+                </article>
+                <a class="stat-card stat-action" href="{% url 'saved_outfits' %}">
+                    <span class="stat-label">SAVED OUTFITS</span>
+                    <strong>{{ saved_outfit_count }}</strong>
+                    <span class="stat-caption">looks you chose to keep</span>
+                </a>
+                <a class="stat-card stat-action" href="{% url 'clothing_add' %}">
+                    <span class="stat-label">READY WHEN YOU ARE</span>
+                    <strong aria-hidden="true">＋</strong>
+                    <span class="stat-caption">Add your first piece</span>
+                </a>
+            </div>
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow"><span class="eyebrow-line"></span> Just added</p>
+                    <h2>Recent pieces</h2>
+                </div>
+                <a class="text-link" href="{% url 'wardrobe' %}">View your wardrobe <span aria-hidden="true">↗</span></a>
+            </div>
+            {% if recent_items %}
+                <div class="clothing-grid recent-grid">
+                    {% for item in recent_items %}
+                        <a class="clothing-card" href="{% url 'clothing_detail' item.pk %}">
+                            <div class="clothing-card-image">
+                                <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}">
+                            </div>
+                            <div class="clothing-card-copy">
+                                <div>
+                                    <h3>{{ item.name }}</h3>
+                                    <p>{{ item.get_category_display }} · {{ item.primary_color }}</p>
+                                </div>
+                                {% if item.is_favorite %}<span class="favorite-mark" aria-label="Favorite">♥</span>{% endif %}
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state compact-empty">
+                    <p>Your wardrobe is ready for its first piece.</p>
+                    <a class="button button-outline" href="{% url 'clothing_add' %}">Add clothing <span aria-hidden="true">↗</span></a>
+                </div>
+            {% endif %}
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "wardrobe/base.html" %}
+{% load static %}
+
+{% block title %}Bulk scan — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block extra_scripts %}
+    <script defer src="{% static 'wardrobe/js/bulk_scanner.js' %}"></script>
+{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="scan" %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content form-page-content">
+            <a class="back-link" href="{% url 'wardrobe' %}">← Back to wardrobe</a>
+            <p class="eyebrow"><span class="eyebrow-line"></span> Your collection</p>
+            <h1 class="page-title">Bulk scan</h1>
+            <p class="dashboard-intro">Select up to {{ max_batch_photos }} clothing photos. Each photo is identified separately and added to your private wardrobe.</p>
+
+            <div class="analysis-notice">
+                <span class="status-dot"></span>
+                {% if ai_enabled %}
+                    <span>{{ ai_provider }} AI will process each photo individually. Photos are sent to {{ ai_provider }} for analysis; wardrobe images remain private in your account.</span>
+                {% else %}
+                    <span>AI is not configured. Photos can be queued privately, but will not be analyzed until a GROQ_API_KEY is added to your local environment.</span>
+                {% endif %}
+            </div>
+
+            <section
+                class="bulk-scanner"
+                data-bulk-scanner
+                data-max-photos="{{ max_batch_photos }}"
+                data-chunk-size="{{ chunk_size }}"
+                data-create-url="{% url 'scan_batch_create' %}"
+                data-batch-upload-url="{% url 'scan_batch_upload' '00000000-0000-0000-0000-000000000000' %}"
+                data-status-url="{% url 'scan_status' '00000000-0000-0000-0000-000000000000' %}"
+                data-process-url="{% url 'scan_process_photo' '00000000-0000-0000-0000-000000000000' 0 %}"
+            >
+                <form class="clothing-form bulk-upload-form" data-upload-form enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="bulk-picker">
+                        <label class="bulk-picker-label" for="bulk-image-input">Choose clothing photos</label>
+                        <input
+                            id="bulk-image-input"
+                            name="images"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            data-bulk-image-input
+                        >
+                        <p class="field-help">JPEG, PNG or WebP · up to 10 MB per photo · uploaded in groups of {{ chunk_size }}.</p>
+                    </div>
+                    <div class="bulk-preview-grid" data-preview-grid aria-live="polite"></div>
+                    <div class="form-actions">
+                        <button class="button button-light" type="submit" data-upload-button>Upload and scan <span aria-hidden="true">↗</span></button>
+                        <button class="button button-outline" type="button" data-retry-button hidden>Retry failed photos</button>
+                        <a class="text-link" href="{% url 'wardrobe' %}">Cancel</a>
+                    </div>
+                </form>
+
+                <section class="scan-progress" data-scan-progress hidden aria-live="polite">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow"><span class="eyebrow-line"></span> Scan progress</p>
+                            <h2 data-progress-title>Ready</h2>
+                        </div>
+                        <span class="scan-counts" data-scan-counts></span>
+                    </div>
+                    <progress max="100" value="0" data-progress-bar></progress>
+                    <p class="scan-status-message" data-status-message></p>
+                    <ul class="scan-photo-list" data-photo-list></ul>
+                </section>
+                <p class="scan-feedback" data-feedback role="status" aria-live="polite"></p>
+            </section>
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

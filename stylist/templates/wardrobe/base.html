@@ -1,0 +1,27 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111110">
+    <meta name="description" content="A private digital wardrobe and personal outfit stylist.">
+    <title>{% block title %}Atelier — Your personal stylist{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'wardrobe/icons/favicon.svg' %}">
+    <link rel="manifest" href="{% static 'wardrobe/manifest.webmanifest' %}">
+    <link rel="stylesheet" href="{% static 'wardrobe/css/style.css' %}">
+    <script defer src="{% static 'wardrobe/js/app.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% if messages %}
+        <div class="message-stack" aria-live="polite">
+            {% for message in messages %}
+                <p class="flash-message {{ message.tags }}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% block page %}{% endblock %}
+    <button class="pwa-install-button" type="button" data-pwa-install hidden>Install Atelier</button>
+</body>
+</html>

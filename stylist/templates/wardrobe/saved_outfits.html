@@ -1,0 +1,77 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}Saved outfits — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="saved-outfits" %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content">
+            <div class="page-heading-row">
+                <div>
+                    <p class="eyebrow"><span class="eyebrow-line"></span> Kept for another day</p>
+                    <h1 class="page-title">Saved outfits<span class="title-count">{{ outfits|length }}</span></h1>
+                    <p class="dashboard-intro">The combinations you chose to keep, made from pieces you own.</p>
+                </div>
+                <a class="button button-light" href="{% url 'outfit_generator' %}">Find outfit ideas <span aria-hidden="true">↗</span></a>
+            </div>
+
+            {% if outfits %}
+                <div class="saved-outfit-grid">
+                    {% for outfit in outfits %}
+                        <article class="outfit-card saved-outfit-card">
+                            <header class="outfit-card-heading">
+                                <div>
+                                    <p class="eyebrow"><span class="eyebrow-line"></span>{% if outfit.occasion %}{{ outfit.occasion }}{% else %}Your style{% endif %}</p>
+                                    <h2>{{ outfit.name }}</h2>
+                                </div>
+                                <form method="post" action="{% url 'outfit_favorite' outfit.pk %}">
+                                    {% csrf_token %}
+                                    <button class="favorite-outfit-button" type="submit" aria-label="{% if outfit.is_favorite %}Remove {{ outfit.name }} from favorites{% else %}Favorite {{ outfit.name }}{% endif %}" aria-pressed="{{ outfit.is_favorite|yesno:'true,false' }}">
+                                        {% if outfit.is_favorite %}♥{% else %}♡{% endif %}
+                                    </button>
+                                </form>
+                            </header>
+                            {% if outfit.items.all %}
+                                <div class="outfit-piece-grid">
+                                    {% for item in outfit.items.all %}
+                                        <a class="outfit-piece" href="{% url 'clothing_detail' item.pk %}">
+                                            <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}" loading="lazy">
+                                            <span>{{ item.name }}</span>
+                                            <small>{{ item.get_category_display }} · {{ item.primary_color }}</small>
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="outfit-method-note">The pieces in this look are no longer in your wardrobe.</p>
+                            {% endif %}
+                            {% if outfit.season %}<p class="saved-outfit-meta">Season · {{ outfit.season }}</p>{% endif %}
+                            {% if outfit.notes %}<p class="saved-outfit-notes">{{ outfit.notes|linebreaksbr }}</p>{% endif %}
+                            <form method="post" action="{% url 'outfit_delete' outfit.pk %}" data-confirm="Remove {{ outfit.name }} from your saved outfits?">
+                                {% csrf_token %}
+                                <button class="text-link delete-link" type="submit">Delete outfit</button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">♡</span>
+                    <h2>No saved outfits yet</h2>
+                    <p>Generate ideas from your wardrobe, review the pieces, and save the looks you want to keep.</p>
+                    <a class="button button-light" href="{% url 'outfit_generator' %}">Find outfit ideas <span aria-hidden="true">↗</span></a>
+                </div>
+            {% endif %}
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}My wardrobe — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="wardrobe" %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content wardrobe-content">
+            <div class="page-heading-row">
+                <div>
+                    <p class="eyebrow"><span class="eyebrow-line"></span> Your collection</p>
+                    <h1 class="page-title">My wardrobe<span class="title-count">{{ item_count }}</span></h1>
+                    <p class="dashboard-intro">Every piece you own, thoughtfully in one place.</p>
+                </div>
+                <a class="button button-light" href="{% url 'clothing_add' %}">Add a piece <span aria-hidden="true">＋</span></a>
+            </div>
+
+            <form class="filter-form" method="get">
+                <div class="filter-search">
+                    <label class="sr-only" for="filter-search">Search your wardrobe</label>
+                    <input id="filter-search" type="search" name="q" value="{{ search }}" placeholder="Search name, color, occasion…">
+                </div>
+                <div class="filter-fields">
+                    <label class="sr-only" for="filter-category">Category</label>
+                    <select id="filter-category" name="category">
+                        <option value="">All categories</option>
+                        {% for value, label in categories %}
+                            <option value="{{ value }}"{% if selected_category == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="sr-only" for="filter-style">Style</label>
+                    <select id="filter-style" name="style">
+                        <option value="">All styles</option>
+                        {% for value, label in styles %}
+                            <option value="{{ value }}"{% if selected_style == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="sr-only" for="filter-color">Color</label>
+                    <input id="filter-color" type="text" name="color" value="{{ selected_color }}" placeholder="Color">
+                    <label class="sr-only" for="filter-season">Season</label>
+                    <input id="filter-season" type="text" name="season" value="{{ selected_season }}" placeholder="Season">
+                    <label class="sr-only" for="filter-occasion">Occasion</label>
+                    <input id="filter-occasion" type="text" name="occasion" value="{{ selected_occasion }}" placeholder="Occasion">
+                </div>
+                <div class="filter-actions">
+                    <button class="button button-outline button-small" type="submit">Apply filters</button>
+                    {% if search or selected_category or selected_color or selected_style or selected_season or selected_occasion %}
+                        <a class="text-link filter-clear" href="{% url 'wardrobe' %}">Clear all</a>
+                    {% endif %}
+                </div>
+            </form>
+
+            {% if items %}
+                <div class="clothing-grid">
+                    {% for item in items %}
+                        <article class="clothing-card">
+                            <a class="clothing-card-image" href="{% url 'clothing_detail' item.pk %}">
+                                <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}" loading="lazy">
+                            </a>
+                            <form class="favorite-toggle" method="post" action="{% url 'clothing_favorite' item.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" aria-label="{% if item.is_favorite %}Remove {{ item.name }} from favorites{% else %}Add {{ item.name }} to favorites{% endif %}" aria-pressed="{{ item.is_favorite|yesno:'true,false' }}">
+                                    {% if item.is_favorite %}♥{% else %}♡{% endif %}
+                                </button>
+                            </form>
+                            <a class="clothing-card-copy" href="{% url 'clothing_detail' item.pk %}">
+                                <div>
+                                    <h2>{{ item.name }}</h2>
+                                    <p>{{ item.get_category_display }} <span aria-hidden="true">·</span> {{ item.primary_color }}</p>
+                                </div>
+                                <span class="card-arrow" aria-hidden="true">↗</span>
+                            </a>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% elif search or selected_category or selected_color or selected_style or selected_season or selected_occasion %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">⌕</span>
+                    <h2>No pieces found</h2>
+                    <p>Try a different search or clear your filters.</p>
+                    <a class="button button-outline" href="{% url 'wardrobe' %}">Clear filters</a>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">◇</span>
+                    <h2>Your collection starts here</h2>
+                    <p>Add the pieces you love and we’ll keep them together in your private wardrobe.</p>
+                    <a class="button button-light" href="{% url 'clothing_add' %}">Add your first piece <span aria-hidden="true">↗</span></a>
+                </div>
+            {% endif %}
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

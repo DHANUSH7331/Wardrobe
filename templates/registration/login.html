@@ -1,0 +1,36 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}Sign in — Atelier{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block page %}
+<main class="auth-shell">
+    <a class="wordmark auth-wordmark" href="{% url 'home' %}">
+        <span class="wordmark-mark">A</span><span>ATELIER</span>
+    </a>
+    <section class="auth-card">
+        <p class="eyebrow"><span class="eyebrow-line"></span> Welcome back</p>
+        <h1>Good to see<br><em>you again.</em></h1>
+        <p class="auth-intro">Sign in to return to your personal style space.</p>
+        {% if form.errors %}
+            <div class="form-alert" role="alert">That username and password combination didn't work. Please try again.</div>
+        {% endif %}
+        <form class="auth-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <div class="field">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {{ form.username }}
+                {% for error in form.username.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="field">
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                {{ form.password }}
+                {% for error in form.password.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+            </div>
+            <button class="button button-light auth-submit" type="submit">Sign in <span aria-hidden="true">↗</span></button>
+        </form>
+        <p class="auth-switch">New to Atelier? <a href="{% url 'register' %}">Create an account</a></p>
+    </section>
+    <p class="auth-footnote">A MORE CONSIDERED WARDROBE, STARTS HERE.</p>
+</main>
+{% endblock %}

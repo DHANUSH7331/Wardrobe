@@ -1,0 +1,81 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}{{ page_title }} — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page=active_page %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content form-page-content">
+            <a class="back-link" href="{% if item %}{% url 'clothing_detail' item.pk %}{% else %}{% url 'wardrobe' %}{% endif %}">← Back to {% if item %}piece{% else %}wardrobe{% endif %}</a>
+            <p class="eyebrow"><span class="eyebrow-line"></span> Your collection</p>
+            <h1 class="page-title">{{ page_title }}</h1>
+            {% if item %}
+                <p class="dashboard-intro">Update any details you want to keep with this piece.</p>
+            {% else %}
+                <p class="dashboard-intro">Add a photo and let your stylist take care of the details.</p>
+            {% endif %}
+
+            <form class="clothing-form" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="form-alert" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+                {% if not item %}
+                    <div class="analysis-notice">
+                        <span class="status-dot"></span>
+                        {% if ai_enabled %}
+                            <span>AI will identify the category, colors, pattern, style and more from your photo.</span>
+                        {% else %}
+                            <span>AI is not configured. Your photo will be saved without analysis; you can add details by editing it.</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                <div class="image-upload-block">
+                    <div class="image-preview-frame">
+                        <img id="image-preview" src="{% if item %}{% url 'clothing_image' item.pk %}{% endif %}" alt="{% if item %}{{ item.name }} preview{% else %}Clothing image preview{% endif %}"{% if not item %} hidden{% endif %}>
+                        <div id="image-placeholder"{% if item %} hidden{% endif %}>
+                            <span class="upload-mark" aria-hidden="true">＋</span>
+                            <span>Piece preview</span>
+                        </div>
+                    </div>
+                    <div class="image-upload-copy">
+                        <label for="{{ form.image.id_for_label }}">{% if item %}Replace photo{% else %}Choose a photo{% endif %}</label>
+                        {{ form.image }}
+                        <p class="field-help">JPEG, PNG or WebP · up to 10 MB. On mobile, choose the camera to take a photo.</p>
+                        {% for error in form.image.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                </div>
+
+                {% if item %}
+                    <div class="clothing-fields">
+                        {% for field in form %}
+                            {% if field.name != 'image' %}
+                                <div class="field{% if field.name == 'occasion' or field.name == 'season' %} field-wide{% endif %}">
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.name == 'occasion' or field.name == 'season' %}
+                                        <span class="field-help">Separate multiple values with commas.</span>
+                                    {% endif %}
+                                    {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <div class="form-actions">
+                    <button class="button button-light" type="submit">{{ submit_label }} <span aria-hidden="true">↗</span></button>
+                    <a class="text-link" href="{% if item %}{% url 'clothing_detail' item.pk %}{% else %}{% url 'wardrobe' %}{% endif %}">Cancel</a>
+                </div>
+            </form>
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+<aside class="sidebar">
+    <a class="wordmark" href="{% url 'dashboard' %}">
+        <span class="wordmark-mark">A</span>
+        <span>ATELIER</span>
+    </a>
+    <div class="sidebar-section-label">YOUR SPACE</div>
+    <nav class="side-nav" aria-label="Main navigation">
+        <a class="side-link {% if active_page == 'dashboard' %}active{% endif %}"
+           href="{% url 'dashboard' %}"{% if active_page == 'dashboard' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">⌂</span> Overview
+        </a>
+        <a class="side-link {% if active_page == 'wardrobe' %}active{% endif %}"
+           href="{% url 'wardrobe' %}"{% if active_page == 'wardrobe' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">◇</span> My wardrobe
+        </a>
+        <a class="side-link {% if active_page == 'add' %}active{% endif %}"
+           href="{% url 'clothing_add' %}"{% if active_page == 'add' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">＋</span> Add a piece
+        </a>
+        <a class="side-link {% if active_page == 'scan' %}active{% endif %}"
+           href="{% url 'scan_clothing' %}"{% if active_page == 'scan' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">✦</span> Bulk scan
+        </a>
+        <a class="side-link {% if active_page == 'outfits' %}active{% endif %}"
+           href="{% url 'outfit_generator' %}"{% if active_page == 'outfits' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">✧</span> Outfit ideas
+        </a>
+        <a class="side-link {% if active_page == 'saved-outfits' %}active{% endif %}"
+           href="{% url 'saved_outfits' %}"{% if active_page == 'saved-outfits' %} aria-current="page"{% endif %}>
+            <span class="nav-icon" aria-hidden="true">♡</span> Saved outfits
+        </a>
+    </nav>
+    <div class="sidebar-bottom">
+        <div class="profile-chip">
+            <div class="avatar" aria-hidden="true">{{ request.user.username|first|upper }}</div>
+            <div class="profile-copy">
+                <span class="profile-name">{{ request.user.username }}</span>
+                <span class="profile-label">PERSONAL ACCOUNT</span>
+            </div>
+        </div>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="side-link logout-link" type="submit">
+                <span class="nav-icon" aria-hidden="true">↗</span> Sign out
+            </button>
+        </form>
+    </div>
+</aside>

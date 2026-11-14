@@ -1,0 +1,163 @@
+{% extends "wardrobe/base.html" %}
+
+{% block title %}Outfit ideas — Atelier{% endblock %}
+{% block body_class %}app-page{% endblock %}
+{% block page %}
+<div class="app-layout">
+    {% include "wardrobe/_sidebar.html" with active_page="outfits" %}
+    <main class="dashboard-main">
+        <header class="topbar">
+            <div class="mobile-brand"><span class="wordmark-mark">A</span><span>ATELIER</span></div>
+            <p class="topbar-date">YOUR PERSONAL STYLE SPACE</p>
+            <div class="topbar-user"><span class="status-dot"></span><span>{{ request.user.username }}</span></div>
+        </header>
+        <section class="dashboard-content form-page-content">
+            <div class="page-heading-row">
+                <div>
+                    <p class="eyebrow"><span class="eyebrow-line"></span> Styled from what you own</p>
+                    <h1 class="page-title">Outfit ideas</h1>
+                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. Groq ranks outfit combinations using clothing details and live web references; photos and account details are not sent.</p>
+                </div>
+                <a class="button button-outline" href="{% url 'saved_outfits' %}">Saved outfits <span aria-hidden="true">↗</span></a>
+            </div>
+
+            <form class="filter-form outfit-filter" method="get">
+                <div class="filter-fields outfit-filter-fields">
+                    <div class="field">
+                        <label for="outfit-occasion">Occasion</label>
+                        {{ form.occasion }}
+                    </div>
+                    <div class="field">
+                        <label for="outfit-season">Season</label>
+                        {{ form.season }}
+                    </div>
+                    <div class="field">
+                        <label for="outfit-style">Preferred style</label>
+                        {{ form.style }}
+                    </div>
+                </div>
+                <fieldset class="outfit-selection">
+                    <legend>Pieces to consider <span>(optional)</span></legend>
+                    <p class="field-help">Selected pieces are preferences, not requirements. With no selection, all your wardrobe pieces are considered.</p>
+                    {% if wardrobe_items %}
+                        <div class="outfit-selection-grid">
+                            {% for item in wardrobe_items %}
+                                <label class="outfit-selection-card">
+                                    <input
+                                        type="checkbox"
+                                        name="selected_items"
+                                        value="{{ item.pk }}"
+                                        {% if item.pk in selected_item_ids %}checked{% endif %}
+                                    >
+                                    <span>
+                                        <strong>{{ item.name }}</strong>
+                                        <small>{{ item.get_category_display }} · {{ item.primary_color }}</small>
+                                    </span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="field-help">Add clothing to your wardrobe to select pieces.</p>
+                    {% endif %}
+                </fieldset>
+                {% if form.errors %}
+                    <p class="field-error">Choose a valid occasion and season.</p>
+                {% endif %}
+                <div class="filter-actions">
+                    <button class="button button-light button-small" type="submit">Find outfit ideas <span aria-hidden="true">↗</span></button>
+                </div>
+            </form>
+
+            {% if recommendations %}
+                <div class="outfit-results" aria-live="polite">
+                    {% for recommendation in recommendations %}
+                        <article class="outfit-card">
+                            <header class="outfit-card-heading">
+                                <div>
+                                    <p class="eyebrow"><span class="eyebrow-line"></span> Look {{ forloop.counter }}</p>
+                                    <h2>{{ form.cleaned_data.occasion|default:"Everyday" }}</h2>
+                                </div>
+                                <span class="outfit-score">{{ recommendation.score }}<small>/100</small></span>
+                            </header>
+                            <div class="outfit-piece-grid">
+                                {% for item in recommendation.items %}
+                                    <a class="outfit-piece" href="{% url 'clothing_detail' item.pk %}">
+                                        <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}" loading="lazy">
+                                        <span>{{ item.name }}</span>
+                                        <small>{{ item.get_category_display }} · {{ item.primary_color }}</small>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                            <ul class="outfit-reasons">
+                                {% for reason in recommendation.reasons %}<li>{{ reason }}</li>{% endfor %}
+                            </ul>
+                            <form class="outfit-save-form" method="post" action="{% url 'outfit_save' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="occasion" value="{{ form.cleaned_data.occasion }}">
+                                <input type="hidden" name="season" value="{{ form.cleaned_data.season }}">
+                                {% for item in recommendation.items %}
+                                    <input type="hidden" name="item_ids" value="{{ item.pk }}">
+                                {% endfor %}
+                                <div class="field">
+                                    <label for="outfit-name-{{ forloop.counter }}">Name this outfit</label>
+                                    <input id="outfit-name-{{ forloop.counter }}" name="name" maxlength="100" value="Look {{ forloop.counter }}" required>
+                                </div>
+                                <div class="field">
+                                    <label for="outfit-notes-{{ forloop.counter }}">Personal note <span>(optional)</span></label>
+                                    <textarea id="outfit-notes-{{ forloop.counter }}" name="notes" rows="2" placeholder="Add a note for later"></textarea>
+                                </div>
+                                <button class="button button-light button-small" type="submit">Save this look <span aria-hidden="true">↗</span></button>
+                            </form>
+                        </article>
+                    {% endfor %}
+                </div>
+                {% if ai_used %}
+                    <p class="outfit-method-note">Groq ranked these looks using your clothing details and available web references. The /100 score is a separate wardrobe compatibility score.</p>
+                {% elif ai_error %}
+                    <p class="outfit-ai-warning">{{ ai_error }} The displayed order and explanations are rule-based; no AI ranking was applied.</p>
+                {% endif %}
+                <section class="web-style-results">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow"><span class="eyebrow-line"></span> Live web search</p>
+                            <h2>Style references</h2>
+                        </div>
+                    </div>
+                    {% if web_search_error %}
+                        <p class="outfit-method-note">{{ web_search_error }}</p>
+                    {% elif web_results %}
+                        <ul>
+                            {% for result in web_results %}
+                                <li>
+                                    <a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.title }} <span aria-hidden="true">↗</span></a>
+                                    {% if result.snippet %}<p>{{ result.snippet }}</p>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="outfit-method-note">No web results were found for this look. Your wardrobe-based suggestions are still available.</p>
+                    {% endif %}
+                    <p class="outfit-method-note">Web results are styling references. Garment descriptions—not photos—are sent to Groq when it ranks these looks.</p>
+                </section>
+            {% elif has_generated %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">◇</span>
+                    <h2>Not enough matching pieces yet</h2>
+                    <p>Add at least two compatible pieces, such as a top and trousers, or a dress and shoes. Your existing wardrobe items are used automatically.</p>
+                    <a class="button button-outline" href="{% url 'wardrobe' %}">View your wardrobe <span aria-hidden="true">↗</span></a>
+                </div>
+            {% else %}
+                <div class="empty-state compact-empty">
+                    <span class="empty-mark" aria-hidden="true">✧</span>
+                    <h2>Your wardrobe, styled together</h2>
+                    <p>Choose an occasion or season to get combinations from the pieces already in your wardrobe.</p>
+                </div>
+            {% endif %}
+        </section>
+        <footer class="dashboard-footer">
+            <span>ATELIER — YOUR PERSONAL STYLIST</span>
+            <span>PRIVATE SPACE · {{ request.user.username|upper }}</span>
+        </footer>
+    </main>
+</div>
+{% endblock %}
