@@ -18,6 +18,9 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 mimetypes.add_type('text/css', '.css')
+# Windows may register .js as application/x-js; browsers require a JavaScript MIME type.
+mimetypes.add_type('text/javascript', '.js')
+mimetypes.add_type('text/javascript', '.mjs')
 mimetypes.add_type('application/manifest+json', '.webmanifest')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
