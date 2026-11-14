@@ -151,6 +151,7 @@
 
         .button:hover { background: #d7bb98; transform: translateY(-2px); }
         .button[hidden] { display: none; }
+        .button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
         .text-link {
             color: var(--ink);
@@ -398,8 +399,9 @@
                 Sign-in, private wardrobe data, clothing uploads, and AI outfit styling
                 need the Django backend. GitHub Pages cannot run Django or SQLite; those
                 features will be available here after the backend is deployed and connected.
-                Set the public HTTPS backend URL in the
-                <code>atelier-backend-url</code> meta tag to connect the Sign in button.
+                Set the public HTTPS Django backend URL in the
+                <code>atelier-backend-url</code> meta tag. Sign in then opens the backend
+                login page and returns to the dashboard after authentication.
             </div>
         </section>
     </main>
@@ -416,18 +418,43 @@
         const configuredBackendUrl = document
             .querySelector('meta[name="atelier-backend-url"]')
             .content.trim();
-        const localBackendUrl = location.protocol === 'file:'
+        const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname);
+        const localBackendUrl = isLocalHost || location.protocol === 'file:'
             ? 'http://127.0.0.1:8000'
-            : ['localhost', '127.0.0.1'].includes(location.hostname)
-                ? location.origin
-                : '';
+            : '';
         const backendUrl = configuredBackendUrl || localBackendUrl;
+        let loginReady = false;
 
         if (backendUrl) {
-            signInLink.href = new URL('/accounts/login/', backendUrl).href;
+            try {
+                const backend = new URL(backendUrl);
+                const secureBackend = backend.protocol === 'https:'
+                    || (backend.protocol === 'http:'
+                        && ['localhost', '127.0.0.1'].includes(backend.hostname));
+                if (secureBackend) {
+                    const loginUrl = new URL('/accounts/login/', backend.origin);
+                    loginUrl.searchParams.set('next', '/dashboard/');
+                    signInLink.href = loginUrl.href;
+                    signInLink.removeAttribute('aria-disabled');
+                    signInLink.removeAttribute('title');
+                    loginReady = true;
+                }
+            } catch (error) {
+                console.warn('Atelier backend URL is invalid.');
+            }
         }
 
-        if ('serviceWorker' in navigator) {
+        if (!loginReady) {
+            signInLink.href = '#app-status';
+            signInLink.setAttribute('aria-disabled', 'true');
+            signInLink.title = 'Configure the public HTTPS Django backend URL to sign in.';
+            signInLink.addEventListener('click', (event) => event.preventDefault());
+        }
+
+        const localServiceWorkerHost = ['localhost', '127.0.0.1'].includes(location.hostname);
+        const secureServiceWorkerPage = location.protocol === 'https:'
+            || (location.protocol === 'http:' && localServiceWorkerHost);
+        if ('serviceWorker' in navigator && secureServiceWorkerPage) {
             navigator.serviceWorker.register('./service-worker.js')
                 .catch((error) => {
                     console.error('Atelier Pages service worker registration failed:', error);

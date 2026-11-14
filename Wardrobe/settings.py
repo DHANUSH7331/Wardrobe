@@ -18,6 +18,15 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 mimetypes.add_type('text/css', '.css')
+# Force browser-compatible JavaScript MIME types on Windows and other platforms.
+# Register both strict and non-strict mappings, then explicitly override the maps
+# used by Python's mimetypes.guess_type() (which Django's static handler relies on).
+for extension in ('.js', '.mjs'):
+    mimetypes.add_type('text/javascript', extension, strict=True)
+    mimetypes.add_type('text/javascript', extension, strict=False)
+    mimetypes.types_map[extension] = 'text/javascript'
+    mimetypes.common_types[extension] = 'text/javascript'
+
 mimetypes.add_type('application/manifest+json', '.webmanifest')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
