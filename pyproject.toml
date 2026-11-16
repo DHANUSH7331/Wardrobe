@@ -11,4 +11,4 @@ dependencies = [
 ]
 
 [tool.vercel.scripts]
-build = 'if [ -z "$DATABASE_URL_UNPOOLED" ]; then echo "Connect a PostgreSQL database in Vercel before deploying."; exit 1; fi; DATABASE_URL="$DATABASE_URL_UNPOOLED" python manage.py migrate --noinput'
+build = 'if [ -z "$DATABASE_URL" ]; then echo "Connect Prisma Postgres to this Vercel project and enable DATABASE_URL for Production."; exit 1; fi; DJANGO_DATABASE_URL="$DATABASE_URL" python manage.py migrate --noinput'

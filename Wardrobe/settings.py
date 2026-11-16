@@ -127,17 +127,23 @@ WSGI_APPLICATION = 'Wardrobe.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = (
+    os.environ.get('DJANGO_DATABASE_URL')
+    or os.environ.get('DATABASE_URL_POOLED')
+    or os.environ.get('DATABASE_URL')
+)
 if DATABASE_URL:
     import dj_database_url
 
     DATABASES = {
         'default': dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=600,
+            conn_max_age=0 if ON_VERCEL else 600,
             ssl_require=ON_VERCEL,
         )
     }
+    if os.environ.get('DATABASE_URL_POOLED') and not os.environ.get('DJANGO_DATABASE_URL'):
+        DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
 else:
     DATABASES = {
         'default': {
