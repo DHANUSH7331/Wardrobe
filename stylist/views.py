@@ -2,7 +2,9 @@ import hashlib
 import mimetypes
 import os
 from datetime import timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.staticfiles import finders
@@ -11,7 +13,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import transaction
 from django.db.models import Count, Q
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -54,7 +56,8 @@ scan_image_extension_validator = FileExtensionValidator(
 def home(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
-    return redirect('login')
+    landing_page = Path(settings.BASE_DIR, 'index.html').read_text(encoding='utf-8')
+    return HttpResponse(landing_page, content_type='text/html; charset=utf-8')
 
 
 @require_GET

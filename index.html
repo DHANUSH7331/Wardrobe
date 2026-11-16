@@ -351,6 +351,7 @@
                 </p>
                 <div class="actions">
                     <a class="button" href="#app-status" data-sign-in>Sign in</a>
+                    <a class="button" href="#app-status" data-register>Create account</a>
                     <a class="button" href="#experience">Explore Atelier</a>
                     <button class="button" type="button" data-pwa-install hidden>Install Atelier</button>
                     <a class="text-link" href="#app-status">About the app</a>
@@ -414,6 +415,7 @@
     <script>
         const installButton = document.querySelector('[data-pwa-install]');
         const signInLink = document.querySelector('[data-sign-in]');
+        const registerLink = document.querySelector('[data-register]');
         let installPrompt = null;
         const configuredBackendUrl = document
             .querySelector('meta[name="atelier-backend-url"]')
@@ -435,8 +437,11 @@
                     const loginUrl = new URL('/accounts/login/', backend.origin);
                     loginUrl.searchParams.set('next', '/dashboard/');
                     signInLink.href = loginUrl.href;
+                    registerLink.href = new URL('/accounts/register/', backend.origin).href;
                     signInLink.removeAttribute('aria-disabled');
                     signInLink.removeAttribute('title');
+                    registerLink.removeAttribute('aria-disabled');
+                    registerLink.removeAttribute('title');
                     loginReady = true;
                 }
             } catch (error) {
@@ -446,9 +451,18 @@
 
         if (!loginReady) {
             signInLink.href = '#app-status';
+            registerLink.href = '#app-status';
             signInLink.setAttribute('aria-disabled', 'true');
+            registerLink.setAttribute('aria-disabled', 'true');
             signInLink.title = 'Configure the public HTTPS Django backend URL to sign in.';
+            registerLink.title = 'Configure the public HTTPS Django backend URL to create an account.';
             signInLink.addEventListener('click', (event) => event.preventDefault());
+            registerLink.addEventListener('click', (event) => event.preventDefault());
+        }
+
+        if (['localhost', '127.0.0.1'].includes(location.hostname)) {
+            document.querySelector('link[rel="icon"]').href = '/static/wardrobe/icons/favicon.svg';
+            document.querySelector('link[rel="manifest"]').href = '/static/wardrobe/manifest.webmanifest';
         }
 
         const localServiceWorkerHost = ['localhost', '127.0.0.1'].includes(location.hostname);
