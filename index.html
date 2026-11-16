@@ -397,12 +397,10 @@
             <h2 class="section-heading" id="app-status-title">The landing page is <em>ready.</em></h2>
             <div class="backend-note" role="status">
                 <strong>This GitHub Pages site is a static landing page.</strong>
-                Sign-in, private wardrobe data, clothing uploads, and AI outfit styling
-                need the Django backend. GitHub Pages cannot run Django or SQLite; those
-                features will be available here after the backend is deployed and connected.
-                Set the public HTTPS Django backend URL in the
-                <code>atelier-backend-url</code> meta tag. Sign in then opens the backend
-                login page and returns to the dashboard after authentication.
+                GitHub Pages cannot run Django or SQLite. On this computer, the account
+                buttons open the local Django app at <code>127.0.0.1:8000</code>. To let
+                other visitors sign in or create accounts, deploy Django and set its public
+                HTTPS address in the <code>atelier-backend-url</code> meta tag.
             </div>
         </section>
     </main>
@@ -421,7 +419,8 @@
             .querySelector('meta[name="atelier-backend-url"]')
             .content.trim();
         const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname);
-        const localBackendUrl = isLocalHost || location.protocol === 'file:'
+        const isThisProjectGitHubPages = location.hostname === 'dhanush7331.github.io';
+        const localBackendUrl = isLocalHost || location.protocol === 'file:' || isThisProjectGitHubPages
             ? 'http://127.0.0.1:8000'
             : '';
         const backendUrl = configuredBackendUrl || localBackendUrl;

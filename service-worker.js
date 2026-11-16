@@ -1,4 +1,4 @@
-const CACHE_NAME = 'atelier-pages-shell-v1';
+const CACHE_NAME = 'atelier-pages-shell-v2';
 const BASE_URL = new URL('./', self.location.href);
 const OFFLINE_URL = new URL('offline.html', BASE_URL).href;
 const SHELL_URLS = [
@@ -42,7 +42,7 @@ self.addEventListener('fetch', (event) => {
 
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request).catch(async () => (
+            fetch(request, { cache: 'no-cache' }).catch(async () => (
                 await caches.match(request) || caches.match(OFFLINE_URL)
             )),
         );
@@ -51,9 +51,13 @@ self.addEventListener('fetch', (event) => {
 
     if (SHELL_URLS.includes(requestUrl.href)) {
         event.respondWith(
-            caches.match(request).then((cachedResponse) => (
-                cachedResponse || fetch(request)
-            )),
+            fetch(request, { cache: 'no-cache' }).then(async (response) => {
+                if (response.ok) {
+                    const cache = await caches.open(CACHE_NAME);
+                    await cache.put(request, response.clone());
+                }
+                return response;
+            }).catch(async () => caches.match(request)),
         );
     }
 });
