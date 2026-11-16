@@ -54,7 +54,7 @@ scan_image_extension_validator = FileExtensionValidator(
 def home(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
-    return render(request, 'wardrobe/home.html')
+    return redirect('login')
 
 
 @require_GET
