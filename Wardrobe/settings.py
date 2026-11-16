@@ -34,7 +34,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() in {'true', '1', 'yes'}
+ON_VERCEL = bool(
+    os.environ.get('VERCEL')
+    or os.environ.get('VERCEL_URL')
+    or os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
+)
+DEBUG = os.environ.get(
+    'DJANGO_DEBUG', 'false' if ON_VERCEL else 'true'
+).lower() in {'true', '1', 'yes'}
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
     if not DEBUG:
@@ -51,6 +58,27 @@ ALLOWED_HOSTS = [
     ).split(',')
     if host.strip()
 ]
+for vercel_host in (
+    os.environ.get('VERCEL_URL', ''),
+    os.environ.get('VERCEL_PROJECT_PRODUCTION_URL', ''),
+    'wardrobe-fawn-omega.vercel.app',
+):
+    vercel_host = vercel_host.strip().removeprefix('https://').removeprefix('http://').rstrip('/')
+    if vercel_host and vercel_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(vercel_host)
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+for host in ALLOWED_HOSTS:
+    if host.endswith('.vercel.app'):
+        origin = f'https://{host}'
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+if ON_VERCEL:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -98,12 +126,24 @@ WSGI_APPLICATION = 'Wardrobe.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=ON_VERCEL,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation

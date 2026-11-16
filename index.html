@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#111110">
     <meta name="description" content="A more considered wardrobe, with personal outfit ideas from Atelier.">
-    <meta name="atelier-backend-url" content="">
+    <meta name="atelier-backend-url" content="https://wardrobe-fawn-omega.vercel.app">
     <title>Atelier — Your wardrobe, with intention</title>
     <link rel="icon" type="image/svg+xml" href="./stylist/static/wardrobe/icons/favicon.svg">
     <link rel="manifest" type="application/manifest+json" href="./manifest.webmanifest">
@@ -419,11 +419,10 @@
             .querySelector('meta[name="atelier-backend-url"]')
             .content.trim();
         const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname);
-        const isThisProjectGitHubPages = location.hostname === 'dhanush7331.github.io';
-        const localBackendUrl = isLocalHost || location.protocol === 'file:' || isThisProjectGitHubPages
+        const localBackendUrl = isLocalHost || location.protocol === 'file:'
             ? 'http://127.0.0.1:8000'
             : '';
-        const backendUrl = configuredBackendUrl || localBackendUrl;
+        const backendUrl = localBackendUrl || configuredBackendUrl;
         let loginReady = false;
 
         if (backendUrl) {
