@@ -40,7 +40,7 @@ ON_VERCEL = bool(
     or os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
 )
 DEBUG = os.environ.get(
-    'DJANGO_DEBUG', 'false' if ON_VERCEL else 'true'
+    'DJANGO_DEBUG', 'false'
 ).lower() in {'true', '1', 'yes'}
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
@@ -62,6 +62,7 @@ for vercel_host in (
     os.environ.get('VERCEL_URL', ''),
     os.environ.get('VERCEL_PROJECT_PRODUCTION_URL', ''),
     'wardrobe-fawn-omega.vercel.app',
+    'wardrobe-9bbz.vercel.app',
 ):
     vercel_host = vercel_host.strip().removeprefix('https://').removeprefix('http://').rstrip('/')
     if vercel_host and vercel_host not in ALLOWED_HOSTS:
