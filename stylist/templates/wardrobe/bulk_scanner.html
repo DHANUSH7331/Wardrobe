@@ -26,7 +26,7 @@
                 {% if ai_enabled %}
                     <span>{{ ai_provider }} AI will process each photo individually. Photos are sent to {{ ai_provider }} for analysis; wardrobe images remain private in your account.</span>
                 {% else %}
-                    <span>AI is not configured. Photos can be queued privately, but will not be analyzed until a GROQ_API_KEY is added to your local environment.</span>
+                    <span>AI is not configured. Photos can be queued privately, but will not be analyzed until GROQ_API_KEY is added to the app's environment and the app is redeployed.</span>
                 {% endif %}
             </div>
 

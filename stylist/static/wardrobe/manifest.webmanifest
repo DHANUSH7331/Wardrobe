@@ -3,7 +3,7 @@
   "name": "Atelier — Personal Wardrobe Stylist",
   "short_name": "Atelier",
   "description": "A private digital wardrobe and personal outfit stylist.",
-  "start_url": "/dashboard/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#111110",

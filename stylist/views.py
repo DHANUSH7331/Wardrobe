@@ -57,6 +57,16 @@ def home(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
     landing_page = Path(settings.BASE_DIR, 'index.html').read_text(encoding='utf-8')
+    # The root index is also used by GitHub Pages, where its relative manifest
+    # path is correct. On Django/Vercel, serve the app's collected static PWA
+    # manifest and favicon instead.
+    landing_page = landing_page.replace(
+        'href="./manifest.webmanifest"',
+        'href="/static/wardrobe/manifest.webmanifest"',
+    ).replace(
+        'href="./stylist/static/wardrobe/icons/favicon.svg"',
+        'href="/static/wardrobe/icons/favicon.svg"',
+    )
     return HttpResponse(landing_page, content_type='text/html; charset=utf-8')
 
 
