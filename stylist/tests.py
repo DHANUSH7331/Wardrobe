@@ -665,8 +665,8 @@ class OutfitWorkflowTests(TestCase):
 
         with (
             patch(
-                'stylist.services.ai_outfit_stylist.openai_config',
-                return_value=('test-key', 'gpt-5.4-mini'),
+                'stylist.services.ai_outfit_stylist.openrouter_config',
+                return_value=('test-key', 'qwen/qwen3.7-flash'),
             ),
             patch(
                 'stylist.services.ai_outfit_stylist.generate_content',
@@ -730,7 +730,7 @@ class OutfitWorkflowTests(TestCase):
             patch('stylist.views.search_style_guidance', return_value=[]),
             patch(
                 'stylist.views.rank_outfits',
-                side_effect=AIOutfitStylingError('OpenAI is unavailable.'),
+                side_effect=AIOutfitStylingError('OpenRouter is unavailable.'),
             ),
         ):
             response = self.client.get(
@@ -740,7 +740,7 @@ class OutfitWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context['ai_used'])
-        self.assertContains(response, 'OpenAI is unavailable.')
+        self.assertContains(response, 'OpenRouter is unavailable.')
         self.assertContains(response, 'no AI ranking was applied')
 
     def test_user_can_save_a_reviewed_look_and_other_users_cannot_access_it(self):
@@ -883,11 +883,12 @@ class ImageAnalyzerTests(TestCase):
             content_type='image/png',
         )
 
-    def test_groq_and_gemini_keys_do_not_enable_openai_analysis(self):
+    def test_legacy_provider_keys_do_not_enable_openrouter_analysis(self):
         with patch.dict(
             os.environ,
             {
-                'OPENAI_API_KEY': '',
+                'OPENROUTER_API_KEY': '',
+                'OPENAI_API_KEY': 'legacy-openai-key',
                 'GEMINI_API_KEY': 'legacy-gemini-key',
                 'GROQ_API_KEY': 'legacy-groq-key',
             },
@@ -895,7 +896,7 @@ class ImageAnalyzerTests(TestCase):
         ):
             self.assertFalse(is_configured())
 
-    def test_openai_response_becomes_structured_clothing_attributes(self):
+    def test_openrouter_response_becomes_structured_clothing_attributes(self):
         response_text = json.dumps(
             {
                 'name': 'Blue denim jeans',
@@ -919,12 +920,12 @@ class ImageAnalyzerTests(TestCase):
             patch.dict(
                 os.environ,
                 {
-                    'OPENAI_API_KEY': 'test-key',
-                    'OPENAI_MODEL': 'gpt-5.4-mini',
+                    'OPENROUTER_API_KEY': 'test-key',
+                    'OPENROUTER_MODEL': 'qwen/qwen3.7-flash',
                 },
             ),
             patch(
-                'stylist.services.openai_api.urlopen',
+                'stylist.services.openrouter_api.urlopen',
                 return_value=BytesIO(json.dumps(api_response).encode('utf-8')),
             ) as urlopen_mock,
         ):
@@ -934,10 +935,11 @@ class ImageAnalyzerTests(TestCase):
         request_data = json.loads(request.data)
         self.assertEqual(
             request.full_url,
-            'https://api.openai.com/v1/chat/completions',
+            'https://openrouter.ai/api/v1/chat/completions',
         )
         self.assertEqual(request.get_header('Authorization'), 'Bearer test-key')
-        self.assertEqual(request_data['model'], 'gpt-5.4-mini')
+        self.assertEqual(request.get_header('X-openrouter-title'), 'Wardrobe')
+        self.assertEqual(request_data['model'], 'qwen/qwen3.7-flash')
         self.assertEqual(
             request_data['response_format'],
             {'type': 'json_object'},
@@ -955,7 +957,7 @@ class ImageAnalyzerTests(TestCase):
             'data:image/png;base64,',
         )
 
-    def test_openai_forbidden_response_explains_configuration_and_request_id(self):
+    def test_openrouter_forbidden_response_explains_configuration_and_request_id(self):
         response_body = json.dumps(
             {
                 'error': {
@@ -966,17 +968,17 @@ class ImageAnalyzerTests(TestCase):
             }
         ).encode('utf-8')
         http_error = HTTPError(
-            'https://api.openai.com/v1/chat/completions',
+            'https://openrouter.ai/api/v1/chat/completions',
             403,
             'Forbidden',
-            {'x-request-id': 'req-test-123'},
+            {'x-openrouter-trace-id': 'req-test-123'},
             BytesIO(response_body),
         )
 
         with (
-            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.openai_api.urlopen',
+                'stylist.services.openrouter_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -984,16 +986,16 @@ class ImageAnalyzerTests(TestCase):
                 analyze_clothing(self.make_image())
 
         self.assertIn(
-            'OPENAI_API_KEY',
+            'OPENROUTER_API_KEY',
             str(error.exception),
         )
         self.assertIn('Project does not have model access', str(error.exception))
         self.assertIn('model_access_denied', str(error.exception))
         self.assertIn('req-test-123', str(error.exception))
 
-    def test_openai_rate_limit_remains_retryable(self):
+    def test_openrouter_rate_limit_remains_retryable(self):
         http_error = HTTPError(
-            'https://api.openai.com/v1/chat/completions',
+            'https://openrouter.ai/api/v1/chat/completions',
             429,
             'Too Many Requests',
             {'Retry-After': '3'},
@@ -1001,9 +1003,9 @@ class ImageAnalyzerTests(TestCase):
         )
 
         with (
-            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.openai_api.urlopen',
+                'stylist.services.openrouter_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -1014,9 +1016,32 @@ class ImageAnalyzerTests(TestCase):
         self.assertEqual(error.exception.retry_after, 3.0)
         self.assertIn('Quota exceeded', str(error.exception))
 
-    def test_openai_service_failure_remains_retryable(self):
+    def test_openrouter_insufficient_credits_is_not_retryable(self):
         http_error = HTTPError(
-            'https://api.openai.com/v1/chat/completions',
+            'https://openrouter.ai/api/v1/chat/completions',
+            402,
+            'Payment Required',
+            {},
+            BytesIO(b'{"error":{"message":"Insufficient credits"}}'),
+        )
+
+        with (
+            patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-key'}),
+            patch(
+                'stylist.services.openrouter_api.urlopen',
+                side_effect=http_error,
+            ),
+        ):
+            with self.assertRaises(ImageAnalysisError) as error:
+                analyze_clothing(self.make_image())
+
+        self.assertFalse(error.exception.retryable)
+        self.assertIn('OpenRouter has insufficient credits', str(error.exception))
+        self.assertIn('Insufficient credits', str(error.exception))
+
+    def test_openrouter_service_failure_remains_retryable(self):
+        http_error = HTTPError(
+            'https://openrouter.ai/api/v1/chat/completions',
             503,
             'Unavailable',
             {},
@@ -1024,9 +1049,9 @@ class ImageAnalyzerTests(TestCase):
         )
 
         with (
-            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.openai_api.urlopen',
+                'stylist.services.openrouter_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -1036,11 +1061,11 @@ class ImageAnalyzerTests(TestCase):
         self.assertTrue(error.exception.retryable)
         self.assertIn('Service unavailable', str(error.exception))
 
-    def test_openai_connection_failure_includes_safe_network_cause(self):
+    def test_openrouter_connection_failure_includes_safe_network_cause(self):
         with (
-            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.openai_api.urlopen',
+                'stylist.services.openrouter_api.urlopen',
                 side_effect=URLError('Temporary DNS failure'),
             ),
         ):

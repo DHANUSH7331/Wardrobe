@@ -528,7 +528,7 @@ def scan_process_photo(request, batch_id, photo_id):
         return JsonResponse(
             {
                 'error': (
-                    'AI is not configured. Add an OPENAI_API_KEY, then resume this scan.'
+                    'AI is not configured. Add an OPENROUTER_API_KEY, then resume this scan.'
                 ),
                 'retryable': False,
             },

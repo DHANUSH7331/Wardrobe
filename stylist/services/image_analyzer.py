@@ -2,7 +2,7 @@ import json
 import mimetypes
 
 from ..models import ClothingItem
-from .openai_api import OpenAIAPIError, generate_content, openai_config
+from .openrouter_api import OpenRouterAPIError, generate_content, openrouter_config
 
 
 class ImageAnalysisError(Exception):
@@ -13,18 +13,18 @@ class ImageAnalysisError(Exception):
 
 
 def is_configured():
-    return bool(openai_config()[0])
+    return bool(openrouter_config()[0])
 
 
 def provider_name():
-    return 'OpenAI' if is_configured() else 'AI'
+    return 'OpenRouter' if is_configured() else 'AI'
 
 
 def analyze_clothing(image_file):
-    api_key = openai_config()[0]
+    api_key = openrouter_config()[0]
     if not api_key:
         raise ImageAnalysisError(
-            'AI analysis is not configured. Add an OPENAI_API_KEY to the environment.'
+            'AI analysis is not configured. Add an OPENROUTER_API_KEY to the environment.'
         )
 
     image_file.seek(0)
@@ -54,7 +54,7 @@ def analyze_clothing(image_file):
             mime_type=mime_type,
             timeout=45,
         )
-    except OpenAIAPIError as error:
+    except OpenRouterAPIError as error:
         raise ImageAnalysisError(
             str(error),
             retryable=error.retryable,
@@ -69,12 +69,12 @@ def _parse_analysis(content):
         data = json.loads(content)
     except (TypeError, json.JSONDecodeError) as error:
         raise ImageAnalysisError(
-            'OpenAI returned clothing details in an unexpected format.'
+            'OpenRouter returned clothing details in an unexpected format.'
         ) from error
 
     if not isinstance(data, dict):
         raise ImageAnalysisError(
-            'OpenAI returned clothing details in an unexpected format.'
+            'OpenRouter returned clothing details in an unexpected format.'
         )
 
     name = _text_value(data, 'name', required=True, max_length=100)
@@ -151,12 +151,12 @@ def _text_value(data, key, required=False, max_length=100):
     value = data.get(key, '')
     if not isinstance(value, str):
         raise ImageAnalysisError(
-            f'OpenAI returned an invalid {key} value.'
+            f'OpenRouter returned an invalid {key} value.'
         )
     value = value.strip()
     if required and not value:
         raise ImageAnalysisError(
-            f'OpenAI could not identify {key.replace("_", " ")}.'
+            f'OpenRouter could not identify {key.replace("_", " ")}.'
         )
     return value[:max_length]
 
@@ -169,7 +169,7 @@ def _list_value(data, key, max_length):
         isinstance(value, str) for value in values
     ):
         raise ImageAnalysisError(
-            f'OpenAI returned an invalid {key} value.'
+            f'OpenRouter returned an invalid {key} value.'
         )
     return ', '.join(dict.fromkeys(value.strip() for value in values if value.strip()))[
         :max_length
