@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (submitButton) submitButton.disabled = true;
             if (imageFeedback) imageFeedback.textContent = 'Optimizing photo on this device…';
             try {
-                const optimized = await optimizeImage(imageInput.files[0]);
+                const optimized = await window.AtelierImageTools.optimizeImage(imageInput.files[0]);
                 const transfer = new DataTransfer();
                 transfer.items.add(optimized);
                 imageInput.files = transfer.files;
