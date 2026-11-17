@@ -3,7 +3,7 @@ from django.db.models.fields.files import FieldFile
 from PIL import Image, UnidentifiedImageError
 
 
-MAX_IMAGE_SIZE = 10 * 1024 * 1024
+MAX_IMAGE_SIZE = 4 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 ALLOWED_IMAGE_FORMATS = {'JPEG', 'PNG', 'WEBP'}
 
@@ -12,7 +12,7 @@ def validate_clothing_image(upload):
     if isinstance(upload, FieldFile) and upload._committed:
         return
     if upload.size > MAX_IMAGE_SIZE:
-        raise ValidationError('Images must be 10 MB or smaller.')
+        raise ValidationError('Images must be 4 MB or smaller after optimization.')
 
     try:
         upload.seek(0)

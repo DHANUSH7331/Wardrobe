@@ -45,7 +45,8 @@
                     <div class="image-upload-copy">
                         <label for="{{ form.image.id_for_label }}">{% if item %}Replace photo{% else %}Choose a photo{% endif %}</label>
                         {{ form.image }}
-                        <p class="field-help">JPEG, PNG or WebP · up to 10 MB. On mobile, choose the camera to take a photo.</p>
+                        <p class="field-help">JPEG, PNG or WebP. Photos are resized on your device before upload to reduce mobile memory use.</p>
+                        <p class="field-help" data-image-feedback role="status" aria-live="polite"></p>
                         {% for error in form.image.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
                     </div>
                 </div>

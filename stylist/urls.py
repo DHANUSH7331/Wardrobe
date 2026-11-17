@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path('', views.home, name='home'),
     path('service-worker.js', views.service_worker, name='service_worker'),
+    path('private-media/<path:name>', views.private_media, name='private_media'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path(
         'accounts/login/',

@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let photoData = [];
     let isWorking = false;
     let pageActive = true;
-    let previewUrls = [];
 
     const batchUrl = (template, id) => template.replace(placeholder, id);
     const wait = (milliseconds) => new Promise((resolve) => {
@@ -43,27 +42,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearPreviews() {
-        previewUrls.forEach((url) => URL.revokeObjectURL(url));
-        previewUrls = [];
         previewGrid.replaceChildren();
     }
 
     function showPreviews(files) {
         clearPreviews();
-        files.forEach((file) => {
-            const url = URL.createObjectURL(file);
-            previewUrls.push(url);
+        files.slice(0, 8).forEach((file) => {
             const card = document.createElement('div');
             card.className = 'bulk-preview-card';
-            const image = document.createElement('img');
-            image.src = url;
-            image.alt = '';
-            image.loading = 'lazy';
             const name = document.createElement('span');
             name.textContent = file.name;
-            card.append(image, name);
+            card.append(name);
             previewGrid.append(card);
         });
+        if (files.length > 8) {
+            const remaining = document.createElement('span');
+            remaining.className = 'bulk-preview-more';
+            remaining.textContent = `+ ${files.length - 8} more photos`;
+            previewGrid.append(remaining);
+        }
     }
 
     function renderStatus(data) {
@@ -230,8 +227,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showFeedback(`Select no more than ${maxPhotos} photos in one scan.`, true);
             return;
         }
-        if (files.some((file) => file.size > 10 * 1024 * 1024)) {
-            showFeedback('Each photo must be 10 MB or smaller.', true);
+        if (files.some((file) => file.size > 20 * 1024 * 1024)) {
+            showFeedback('A photo is over 20 MB. Choose a smaller photo to avoid mobile memory problems.', true);
             return;
         }
 
@@ -268,9 +265,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let offset = 0; offset < files.length; offset += chunkSize) {
                 const chunk = files.slice(offset, offset + chunkSize);
+                showFeedback(`Optimizing photo ${offset + 1} of ${files.length} on this device…`);
+                const optimizedFiles = await Promise.all(
+                    chunk.map((file) => window.AtelierImageTools.optimizeImage(file)),
+                );
                 const formData = new FormData();
                 formData.append('csrfmiddlewaretoken', csrfToken);
-                chunk.forEach((file) => formData.append('images', file));
+                optimizedFiles.forEach((file) => formData.append('images', file));
                 const url = batchUrl(root.dataset.batchUploadUrl, batchId);
                 const response = await fetch(url, {
                     method: 'POST',

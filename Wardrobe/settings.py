@@ -192,6 +192,19 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Vercel Functions cannot persist uploads on their local filesystem. Select the
+# private Blob backend there; local development keeps Django's normal storage.
+USE_VERCEL_BLOB = ON_VERCEL or os.environ.get('DJANGO_USE_VERCEL_BLOB', '').lower() in {
+    '1', 'true', 'yes'
+}
+if USE_VERCEL_BLOB:
+    STORAGES = {
+        'default': {'BACKEND': 'stylist.storage.VercelPrivateBlobStorage'},
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration

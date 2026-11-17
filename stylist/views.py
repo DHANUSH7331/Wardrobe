@@ -38,6 +38,7 @@ from .services.ai_outfit_stylist import (
     rank_outfits,
 )
 from .services.outfit_recommender import generate_outfits
+from .storage import image_storage_configured
 from .services.web_style_search import (
     WebStyleSearchError,
     search_style_guidance,
@@ -46,7 +47,7 @@ from .validators import validate_clothing_image
 
 
 MAX_SCAN_BATCH_PHOTOS = 300
-MAX_SCAN_CHUNK_PHOTOS = 10
+MAX_SCAN_CHUNK_PHOTOS = 1
 STALE_SCAN_MINUTES = 5
 scan_image_extension_validator = FileExtensionValidator(
     allowed_extensions=('jpg', 'jpeg', 'png', 'webp')
@@ -304,7 +305,12 @@ def outfit_favorite(request, pk):
 def clothing_add(request):
     form = ClothingPhotoForm(request.POST or None, request.FILES or None)
     ai_enabled = is_configured()
-    if request.method == 'POST' and form.is_valid():
+    if request.method == 'POST' and not image_storage_configured():
+        form.add_error(
+            'image',
+            'Photo storage is not configured yet. Connect a private Vercel Blob store to this project.',
+        )
+    if request.method == 'POST' and form.is_valid() and image_storage_configured():
         image = form.cleaned_data['image']
         if ai_enabled:
             try:
@@ -376,6 +382,16 @@ def scan_batch_create(request):
 @login_required
 @require_POST
 def scan_upload(request, batch_id):
+    if not image_storage_configured():
+        return JsonResponse(
+            {
+                'error': (
+                    'Photo storage is not configured yet. Connect a private '
+                    'Vercel Blob store to this project.'
+                )
+            },
+            status=503,
+        )
     uploads = request.FILES.getlist('images')
     if not uploads:
         return JsonResponse({'error': 'Choose at least one photo.'}, status=400)
@@ -703,6 +719,34 @@ def clothing_image(request, pk):
         ),
     )
     response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@login_required
+@require_GET
+def private_media(request, name):
+    """Serve a private blob only when its database record belongs to the user."""
+    owns_clothing_image = ClothingItem.objects.filter(
+        user=request.user,
+        image=name,
+    ).exists()
+    owns_scan_image = ScanPhoto.objects.filter(
+        batch__user=request.user,
+        image=name,
+    ).exists()
+    if not (owns_clothing_image or owns_scan_image):
+        raise Http404('Image not found.')
+
+    from django.core.files.storage import default_storage
+
+    if not default_storage.exists(name):
+        raise Http404('Image not found.')
+    response = FileResponse(
+        default_storage.open(name, 'rb'),
+        content_type=mimetypes.guess_type(name)[0] or 'application/octet-stream',
+    )
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
     return response
 
 
