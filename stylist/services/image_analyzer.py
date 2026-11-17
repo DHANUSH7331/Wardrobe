@@ -15,6 +15,18 @@ class ImageAnalysisError(Exception):
         self.retry_after = retry_after
 
 
+def _provider_error_detail(error):
+    """Extract a short provider explanation without exposing request secrets."""
+    try:
+        payload = json.loads(error.read().decode('utf-8', errors='replace'))
+        detail = payload.get('error', {}).get('message', '')
+        if isinstance(detail, str):
+            return ' '.join(detail.split())[:500]
+    except (AttributeError, json.JSONDecodeError, TypeError, UnicodeDecodeError):
+        pass
+    return ''
+
+
 GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 GROQ_DEFAULT_MODEL = 'qwen/qwen3.8-27b'
 
@@ -89,9 +101,11 @@ def analyze_clothing(image_file):
         with urlopen(request, timeout=45) as response:
             response_data = json.loads(response.read().decode('utf-8'))
     except HTTPError as error:
+        detail = _provider_error_detail(error)
         if error.code == 401:
             raise ImageAnalysisError(
                 'The vision API rejected the configured API key.'
+                + (f' Details: {detail}' if detail else '')
             ) from error
         if error.code == 429:
             retry_after = None
@@ -110,8 +124,15 @@ def analyze_clothing(image_file):
                 'The vision API is temporarily unavailable. Please try again.',
                 retryable=True,
             ) from error
+        if error.code == 403:
+            raise ImageAnalysisError(
+                'The vision API denied this request (403). Check the API key '
+                'project permissions, model access, and spend limits.'
+                + (f' Details: {detail}' if detail else '')
+            ) from error
         raise ImageAnalysisError(
             f'The vision API request failed with status {error.code}.'
+            + (f' Details: {detail}' if detail else '')
         ) from error
     except (URLError, TimeoutError) as error:
         raise ImageAnalysisError(
