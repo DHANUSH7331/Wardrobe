@@ -1,9 +1,9 @@
-const CACHE_NAME = 'atelier-shell-v4';
+const CACHE_NAME = 'atelier-shell-v5';
 const OFFLINE_URL = '/static/wardrobe/offline.html';
 const SHELL_URLS = [
     OFFLINE_URL,
     '/static/wardrobe/css/style.css',
-    '/static/wardrobe/js/app.js',
+    '/static/wardrobe/js/app.js?v=20261117-upload-fix',
     '/static/wardrobe/icons/favicon.svg',
     '/static/wardrobe/icons/icon-192.png',
     '/static/wardrobe/icons/icon-512.png',
@@ -44,7 +44,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    if (SHELL_URLS.includes(new URL(request.url).pathname)) {
+    const shellPaths = new Set(
+        SHELL_URLS.map((url) => new URL(url, self.location.href).pathname),
+    );
+    if (shellPaths.has(new URL(request.url).pathname)) {
         event.respondWith(
             caches.match(request).then((cachedResponse) => cachedResponse || fetch(request)),
         );
