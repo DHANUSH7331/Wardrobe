@@ -8,13 +8,21 @@ from urllib.request import Request, urlopen
 
 GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash'
+GEMINI_FALLBACK_MODEL = 'gemini-3.5-flash-lite'
 
 
 class GeminiAPIError(Exception):
-    def __init__(self, message, retryable=False, retry_after=None):
+    def __init__(
+        self,
+        message,
+        retryable=False,
+        retry_after=None,
+        status_code=None,
+    ):
         super().__init__(message)
         self.retryable = retryable
         self.retry_after = retry_after
+        self.status_code = status_code
 
 
 def gemini_config():
@@ -59,6 +67,34 @@ def generate_content(
     if system_instruction:
         payload['systemInstruction'] = {'parts': [{'text': system_instruction}]}
 
+    try:
+        response_data = _request_model(api_key, model, payload, timeout)
+    except GeminiAPIError as error:
+        if (
+            error.status_code != 503
+            or model == GEMINI_FALLBACK_MODEL
+        ):
+            raise
+        try:
+            response_data = _request_model(
+                api_key,
+                GEMINI_FALLBACK_MODEL,
+                payload,
+                timeout,
+            )
+        except GeminiAPIError as fallback_error:
+            raise GeminiAPIError(
+                f'{error} Fallback model {GEMINI_FALLBACK_MODEL} also failed: '
+                f'{fallback_error}',
+                retryable=fallback_error.retryable,
+                retry_after=fallback_error.retry_after,
+                status_code=fallback_error.status_code,
+            ) from fallback_error
+
+    return _response_text(response_data)
+
+
+def _request_model(api_key, model, payload, timeout):
     request = Request(
         f'{GEMINI_API_URL}/{quote(model, safe="")}:generateContent',
         data=json.dumps(payload).encode('utf-8'),
@@ -71,7 +107,7 @@ def generate_content(
 
     try:
         with urlopen(request, timeout=timeout) as response:
-            response_data = json.loads(response.read().decode('utf-8'))
+            return json.loads(response.read().decode('utf-8'))
     except HTTPError as error:
         detail = _provider_error_detail(error)
         if error.code == 429:
@@ -86,22 +122,26 @@ def generate_content(
                 + (f' Details: {detail}' if detail else ''),
                 retryable=True,
                 retry_after=retry_after,
+                status_code=error.code,
             ) from error
         if error.code >= 500:
             raise GeminiAPIError(
                 'Gemini is temporarily unavailable. Please try again.'
                 + (f' Details: {detail}' if detail else ''),
                 retryable=True,
+                status_code=error.code,
             ) from error
         if error.code in (401, 403):
             raise GeminiAPIError(
                 f'Gemini rejected the request ({error.code}). Check '
                 'GEMINI_API_KEY and Google AI API access.'
-                + (f' Details: {detail}' if detail else '')
+                + (f' Details: {detail}' if detail else ''),
+                status_code=error.code,
             ) from error
         raise GeminiAPIError(
             f'Gemini request failed with status {error.code}.'
-            + (f' Details: {detail}' if detail else '')
+            + (f' Details: {detail}' if detail else ''),
+            status_code=error.code,
         ) from error
     except (URLError, TimeoutError) as error:
         reason = getattr(error, 'reason', error)
@@ -116,9 +156,6 @@ def generate_content(
         raise GeminiAPIError(
             'Gemini returned an unreadable response.'
         ) from error
-
-    return _response_text(response_data)
-
 
 def _provider_error_detail(error):
     try:
