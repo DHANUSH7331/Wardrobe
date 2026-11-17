@@ -967,7 +967,7 @@ class ImageAnalyzerTests(TestCase):
             'https://api.groq.com/openai/v1/chat/completions',
             403,
             'Forbidden',
-            {},
+            {'x-groq-request-id': 'req-test-123'},
             BytesIO(response_body),
         )
 
@@ -988,3 +988,5 @@ class ImageAnalyzerTests(TestCase):
         self.assertIn('GROQ_VISION_MODEL', str(error.exception))
         self.assertIn('Model access is not enabled', str(error.exception))
         self.assertIn('model_access_denied', str(error.exception))
+        self.assertIn('qwen/qwen3.8-27b', str(error.exception))
+        self.assertIn('req-test-123', str(error.exception))

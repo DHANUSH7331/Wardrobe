@@ -37,6 +37,16 @@ def _provider_error_detail(error):
                 else ''
             ]
         detail = ' '.join(value.strip() for value in details if value.strip())
+        headers = getattr(error, 'headers', None)
+        request_id = (
+            headers.get('x-groq-request-id')
+            or headers.get('x-request-id')
+            if headers
+            else None
+        )
+        if request_id:
+            details.append(f'request_id={request_id}')
+            detail = ' '.join(value.strip() for value in details if value.strip())
         if detail:
             return ' '.join(detail.split())[:500]
     except (AttributeError, json.JSONDecodeError, TypeError, UnicodeDecodeError):
@@ -143,7 +153,7 @@ def analyze_clothing(image_file):
             ) from error
         if error.code == 403:
             raise ImageAnalysisError(
-                'Groq denied access to the configured vision model (403). '
+                f'Groq denied access to model "{model}" (403). '
                 'Verify that GROQ_API_KEY in the Vercel Production environment '
                 'has permission to use GROQ_VISION_MODEL, then redeploy. '
                 'This is a provider permission error, not an image upload or '
