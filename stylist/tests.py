@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 from io import BytesIO
@@ -20,7 +19,6 @@ from .services.image_analyzer import (
     analyze_clothing,
     is_configured,
 )
-from .services.outfit_image_generator import generate_mens_outfit_image
 from .services.web_style_search import (
     search_mens_outfit_images,
     search_style_guidance,
@@ -939,53 +937,7 @@ class OutfitWorkflowTests(TestCase):
         image_search.assert_called_once()
         rank.assert_called_once()
 
-    def test_outfit_image_generation_uses_selected_item_and_owns_images(self):
-        shirt = self.make_item(
-            self.user,
-            'Black shirt',
-            ClothingItem.Category.SHIRT,
-            'Black',
-        )
-        private_shoes = self.make_item(
-            self.other_user,
-            'Private sneakers',
-            ClothingItem.Category.SHOES,
-            'White',
-        )
-
-        with patch(
-            'stylist.views.generate_mens_outfit_image',
-            return_value='data:image/jpeg;base64,dGVzdA==',
-        ) as generate:
-            response = self.client.post(
-                reverse('outfit_image_generate'),
-                {
-                    'item_ids': [str(shirt.pk)],
-                    'occasion': 'Casual outing',
-                    'season': 'Summer',
-                    'style': 'casual',
-                },
-            )
-            private_response = self.client.post(
-                reverse('outfit_image_generate'),
-                {
-                    'item_ids': [str(private_shoes.pk)],
-                    'occasion': 'Casual outing',
-                    'season': 'Summer',
-                    'style': 'casual',
-                },
-            )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json()['image_data_url'],
-            'data:image/jpeg;base64,dGVzdA==',
-        )
-        self.assertEqual(private_response.status_code, 404)
-        generate.assert_called_once()
-        self.assertEqual(generate.call_args.args[0], [shirt])
-
-    def test_outfit_search_auto_image_uses_selected_piece_and_complementary_looks(self):
+    def test_outfit_search_uses_selected_piece_for_web_inspiration_only(self):
         shirt = self.make_item(
             self.user,
             'Black shirt',
@@ -1012,6 +964,10 @@ class OutfitWorkflowTests(TestCase):
             ),
             patch('stylist.views.search_style_guidance', return_value=[]),
             patch(
+                'stylist.views.search_mens_outfit_images',
+                return_value=[],
+            ) as image_search,
+            patch(
                 'stylist.views.rank_outfits',
                 side_effect=lambda recommendations, *args, **kwargs: recommendations,
             ),
@@ -1023,81 +979,16 @@ class OutfitWorkflowTests(TestCase):
                     'season': 'Summer',
                     'style': 'casual',
                     'selected_items': [str(shirt.pk)],
-                    'generate_image': '1',
                 },
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.context['outfit_image_item_ids'],
-            [shirt.pk, jeans.pk],
+            image_search.call_args.args[0]['items'],
+            [shirt, jeans],
         )
-        self.assertTrue(response.context['auto_generate_image'])
-        self.assertContains(response, 'data-outfit-image-generator')
-        self.assertContains(response, 'data-auto-generate="true"')
-
-    def test_outfit_image_generator_sends_reference_photos_to_openrouter(self):
-        shirt = self.make_item(
-            self.user,
-            'Black shirt',
-            ClothingItem.Category.SHIRT,
-            'Black',
-        )
-        generated_image = BytesIO()
-        Image.new('RGB', (2, 2), color=(100, 120, 140)).save(
-            generated_image,
-            format='JPEG',
-        )
-        generated_image_base64 = base64.b64encode(
-            generated_image.getvalue()
-        ).decode('ascii')
-        response = BytesIO(
-            json.dumps(
-                {
-                    'data': [
-                        {
-                            'b64_json': generated_image_base64,
-                            'media_type': 'image/jpeg',
-                        }
-                    ]
-                }
-            ).encode('utf-8')
-        )
-
-        with (
-            patch.dict(os.environ, {'OPENROUTER_IMAGE_MODEL': 'test/image-model'}),
-            patch(
-                'stylist.services.outfit_image_generator.openrouter_config',
-                return_value=('test-key', 'qwen/qwen3.7-flash'),
-            ),
-            patch(
-                'stylist.services.outfit_image_generator.urlopen',
-                return_value=response,
-            ) as open_url,
-        ):
-            image_data_url = generate_mens_outfit_image(
-                [shirt],
-                occasion='Casual outing',
-                season='Summer',
-                style='casual',
-            )
-
-        request = open_url.call_args.args[0]
-        payload = json.loads(request.data.decode('utf-8'))
-        self.assertEqual(
-            image_data_url,
-            f'data:image/jpeg;base64,{generated_image_base64}',
-        )
-        self.assertEqual(payload['model'], 'test/image-model')
-        self.assertEqual(payload['n'], 1)
-        self.assertEqual(len(payload['input_references']), 1)
-        self.assertTrue(
-            payload['input_references'][0]['image_url']['url'].startswith(
-                'data:image/jpeg;base64,'
-            )
-        )
-        self.assertIn('adult male model', payload['prompt'])
-        self.assertEqual(payload['provider']['data_collection'], 'deny')
+        self.assertNotContains(response, 'AI outfit preview')
+        self.assertNotContains(response, 'Generate image')
 
     def test_web_image_search_filters_license_gender_and_unsafe_urls(self):
         payload = {

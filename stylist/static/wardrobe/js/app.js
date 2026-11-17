@@ -151,68 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const outfitImageGenerator = document.querySelector('[data-outfit-image-generator]');
-    if (outfitImageGenerator) {
-        const status = outfitImageGenerator.querySelector('[data-outfit-image-status]');
-        const image = outfitImageGenerator.querySelector('[data-outfit-image-result]');
-        const generateButton = outfitImageGenerator.querySelector('[data-outfit-image-trigger]');
-        const csrf = outfitImageGenerator.querySelector('[name="csrfmiddlewaretoken"]')?.value;
-        const itemIds = outfitImageGenerator.dataset.itemIds
-            .split(',')
-            .filter((itemId) => /^\d+$/.test(itemId));
-        let generating = false;
-
-        const generateImage = async () => {
-            if (generating) return;
-            generating = true;
-            generateButton.disabled = true;
-            generateButton.hidden = true;
-            status.textContent = 'Generating a men’s outfit image. This can take a little while…';
-            const formData = new FormData();
-            itemIds.forEach((itemId) => formData.append('item_ids', itemId));
-            formData.append('occasion', outfitImageGenerator.dataset.occasion);
-            formData.append('season', outfitImageGenerator.dataset.season);
-            formData.append('style', outfitImageGenerator.dataset.style);
-
-            try {
-                const response = await fetch(outfitImageGenerator.dataset.url, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrf,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: formData,
-                });
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.error || 'Image generation did not finish.');
-                }
-                if (typeof result.image_data_url !== 'string'
-                    || !result.image_data_url.startsWith('data:image/')) {
-                    throw new Error('The image service returned no usable image.');
-                }
-                image.src = result.image_data_url;
-                image.hidden = false;
-                status.textContent = 'AI-generated men’s outfit preview.';
-            } catch (error) {
-                status.textContent = `AI image could not be generated: ${error.message}`;
-                generateButton.textContent = 'Try image generation again';
-                generateButton.hidden = false;
-            } finally {
-                generateButton.disabled = false;
-                generating = false;
-            }
-        };
-
-        generateButton.addEventListener('click', generateImage);
-        if (outfitImageGenerator.dataset.autoGenerate === 'true') {
-            const cleanUrl = new URL(window.location.href);
-            cleanUrl.searchParams.delete('generate_image');
-            window.history.replaceState({}, '', cleanUrl);
-            generateImage();
-        }
-    }
-
     if (imageInput && imagePreview && imagePlaceholder) {
         imageInput.addEventListener('change', () => {
             const [file] = imageInput.files;

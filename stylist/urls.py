@@ -26,11 +26,6 @@ urlpatterns = [
         name='clothing_analyze',
     ),
     path('outfits/generate/', views.outfit_generator, name='outfit_generator'),
-    path(
-        'outfits/image/',
-        views.outfit_image_generate,
-        name='outfit_image_generate',
-    ),
     path('outfits/save/', views.outfit_save, name='outfit_save'),
     path('outfits/saved/', views.saved_outfits, name='saved_outfits'),
     path(

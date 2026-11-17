@@ -16,13 +16,12 @@
                 <div>
                     <p class="eyebrow"><span class="eyebrow-line"></span> Styled from what you own</p>
                     <h1 class="page-title">Outfit ideas</h1>
-                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. OpenRouter ranks outfit combinations using clothing details and live web references. If you generate an AI preview, the selected wardrobe photos are sent to OpenRouter; account details are not.</p>
+                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. OpenRouter ranks outfit combinations using clothing details and live web references. Men’s inspiration photos are fetched from the web and shown with source and license attribution.</p>
                 </div>
                 <a class="button button-outline" href="{% url 'saved_outfits' %}">Saved outfits <span aria-hidden="true">↗</span></a>
             </div>
 
             <form class="filter-form outfit-filter" method="get">
-                <input type="hidden" name="generate_image" value="1">
                 <div class="filter-fields outfit-filter-fields">
                     <div class="field">
                         <label for="outfit-occasion">Occasion</label>
@@ -130,42 +129,6 @@
                     <h2>Your wardrobe, styled together</h2>
                     <p>Choose an occasion or season to get combinations from the pieces already in your wardrobe.</p>
                 </div>
-            {% endif %}
-            {% if has_generated and outfit_image_item_ids %}
-                <section
-                    class="outfit-ai-preview"
-                    data-outfit-image-generator
-                    data-url="{% url 'outfit_image_generate' %}"
-                    data-item-ids="{{ outfit_image_item_ids|join:',' }}"
-                    data-auto-generate="{{ auto_generate_image|yesno:'true,false' }}"
-                    data-occasion="{{ form.cleaned_data.occasion|default:'' }}"
-                    data-season="{{ form.cleaned_data.season|default:'' }}"
-                    data-style="{{ form.cleaned_data.style|default:'' }}"
-                >
-                    {% csrf_token %}
-                    <div class="section-heading">
-                        <div>
-                            <p class="eyebrow"><span class="eyebrow-line"></span> AI outfit preview</p>
-                            <h2>Men’s look based on your garment</h2>
-                        </div>
-                    </div>
-                    <p class="outfit-image-status" data-outfit-image-status aria-live="polite">
-                        {% if auto_generate_image %}
-                            Preparing a men’s outfit image from your selected wardrobe piece…
-                        {% else %}
-                            Generate an image based on the wardrobe pieces from your last search.
-                        {% endif %}
-                    </p>
-                    <img
-                        class="outfit-ai-image"
-                        data-outfit-image-result
-                        alt="AI-generated men's outfit based on your selected wardrobe piece"
-                        loading="lazy"
-                        hidden
-                    >
-                    <button class="button button-outline button-small" type="button" data-outfit-image-trigger {% if auto_generate_image %}hidden{% endif %}>Generate image</button>
-                    <p class="outfit-method-note">One AI image uses OpenRouter credits. Selected wardrobe photos are sent to OpenRouter to create the preview.</p>
-                </section>
             {% endif %}
             {% if show_web_results %}
                 <section class="web-style-results">
