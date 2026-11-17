@@ -20,6 +20,11 @@ urlpatterns = [
     path('accounts/register/', views.register, name='register'),
     path('wardrobe/', views.clothing_list, name='wardrobe'),
     path('wardrobe/add/', views.clothing_add, name='clothing_add'),
+    path(
+        'wardrobe/<int:pk>/analyze/',
+        views.clothing_analyze,
+        name='clothing_analyze',
+    ),
     path('outfits/generate/', views.outfit_generator, name='outfit_generator'),
     path('outfits/save/', views.outfit_save, name='outfit_save'),
     path('outfits/saved/', views.saved_outfits, name='saved_outfits'),

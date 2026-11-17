@@ -312,37 +312,26 @@ def clothing_add(request):
         )
     if request.method == 'POST' and form.is_valid() and image_storage_configured():
         image = form.cleaned_data['image']
+        item = ClothingItem.objects.create(
+            user=request.user,
+            image=image,
+            name='Uncategorized piece',
+            category=ClothingItem.Category.OTHER,
+            primary_color='Unspecified',
+        )
         if ai_enabled:
-            try:
-                details = analyze_clothing(image)
-            except ImageAnalysisError as error:
-                messages.error(request, str(error))
-                form.add_error('image', str(error))
-            else:
-                item = ClothingItem.objects.create(
-                    user=request.user,
-                    image=image,
-                    **details,
-                )
-                messages.success(
-                    request,
-                    f'AI analyzed and added {item.name} to your wardrobe.',
-                )
-                return redirect('clothing_detail', pk=item.pk)
-        else:
-            item = ClothingItem.objects.create(
-                user=request.user,
-                image=image,
-                name='Uncategorized piece',
-                category=ClothingItem.Category.OTHER,
-                primary_color='Unspecified',
-            )
-            messages.warning(
+            messages.info(
                 request,
-                'AI is not configured. The photo was saved without analysis; '
-                'edit the piece to add its details manually.',
+                'Photo saved. AI is identifying the clothing details now.',
             )
-            return redirect('clothing_detail', pk=item.pk)
+            return redirect(f'{reverse("clothing_detail", args=(item.pk,))}?analyze=1')
+
+        messages.warning(
+            request,
+            'AI is not configured. The photo was saved without analysis; '
+            'edit the piece to add its details manually.',
+        )
+        return redirect('clothing_detail', pk=item.pk)
 
     return render(
         request,
@@ -655,6 +644,24 @@ def scan_photo_image(request, batch_id, photo_id):
 def clothing_detail(request, pk):
     item = _owned_item(request, pk)
     return render(request, 'wardrobe/clothing_detail.html', {'item': item})
+
+
+@login_required
+@require_POST
+def clothing_analyze(request, pk):
+    """Analyze a saved photo after returning the detail page to the user."""
+    item = _owned_item(request, pk)
+    if not is_configured():
+        return JsonResponse({'error': 'AI analysis is not configured.'}, status=503)
+    try:
+        details = analyze_clothing(item.image)
+    except ImageAnalysisError as error:
+        return JsonResponse({'error': str(error)}, status=502)
+
+    for field, value in details.items():
+        setattr(item, field, value)
+    item.save(update_fields=tuple(details))
+    return JsonResponse({'ok': True, 'name': item.name})
 
 
 @login_required

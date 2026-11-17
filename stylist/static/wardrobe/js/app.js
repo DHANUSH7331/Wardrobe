@@ -1,7 +1,7 @@
 (() => {
     const MAX_UPLOAD_BYTES = 3_500_000;
     const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
-    const MAX_IMAGE_EDGE = 1280;
+    const MAX_IMAGE_EDGE = 1024;
 
     function canvasBlob(canvas, quality) {
         return new Promise((resolve, reject) => {
@@ -104,6 +104,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const imagePlaceholder = document.getElementById('image-placeholder');
     const imageFeedback = document.querySelector('[data-image-feedback]');
     let previewUrl = null;
+
+    const analysisPanel = document.querySelector('[data-analyze-item]');
+    if (analysisPanel) {
+        const message = analysisPanel.querySelector('[data-analysis-message]');
+        const retry = analysisPanel.querySelector('[data-analysis-retry]');
+        const csrf = analysisPanel.querySelector('[name="csrfmiddlewaretoken"]')?.value;
+        let analyzing = false;
+
+        const runAnalysis = async () => {
+            if (analyzing) return;
+            analyzing = true;
+            retry.hidden = true;
+            message.textContent = 'Photo saved. AI is analyzing it; the app remains usable while this runs…';
+            try {
+                const response = await fetch(analysisPanel.dataset.url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'AI analysis did not finish.');
+                message.textContent = 'Analysis complete. Updating clothing details…';
+                window.location.replace(window.location.pathname);
+            } catch (error) {
+                message.textContent = `Photo is saved, but analysis did not finish: ${error.message}`;
+                retry.hidden = false;
+            } finally {
+                analyzing = false;
+            }
+        };
+
+        retry.addEventListener('click', runAnalysis);
+        const cleanUrl = new URL(window.location.href);
+        if (cleanUrl.searchParams.has('analyze')) {
+            cleanUrl.searchParams.delete('analyze');
+            window.history.replaceState({}, '', cleanUrl);
+            runAnalysis();
+        }
+    }
 
     if (imageInput && imagePreview && imagePlaceholder) {
         imageInput.addEventListener('change', () => {

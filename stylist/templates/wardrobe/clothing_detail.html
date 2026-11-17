@@ -18,6 +18,14 @@
                     <img src="{% url 'clothing_image' item.pk %}" alt="{{ item.name }}">
                 </div>
                 <div class="detail-copy">
+                    {% if request.GET.analyze %}
+                        <section class="analysis-notice" data-analyze-item data-url="{% url 'clothing_analyze' item.pk %}" aria-live="polite">
+                            {% csrf_token %}
+                            <span class="status-dot"></span>
+                            <span data-analysis-message>Photo saved. AI is identifying the details; you can keep using the app.</span>
+                            <button class="button button-outline" type="button" data-analysis-retry hidden>Retry analysis</button>
+                        </section>
+                    {% endif %}
                     <p class="eyebrow"><span class="eyebrow-line"></span> {{ item.get_category_display }}</p>
                     <h1 class="page-title">{{ item.name }}</h1>
                     <p class="detail-color">{{ item.primary_color }}{% if item.secondary_color %}<span> · </span>{{ item.secondary_color }}{% endif %}</p>
