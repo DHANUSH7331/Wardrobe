@@ -427,11 +427,20 @@ a.side-link:hover, .side-link.active { color: var(--ink); background: rgba(240,2
 .saved-outfit-card > form:last-child { margin-top: 13px; }
 .web-style-results { max-width: 760px; margin-top: 28px; padding: 18px; border: 1px solid var(--line); background: #171716; }
 .web-style-results .section-heading { margin-bottom: 13px; }
-.web-style-results ul { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
-.web-style-results li { padding-top: 11px; border-top: 1px solid var(--line); }
-.web-style-results li a { color: var(--ink); font-size: 11px; line-height: 1.5; }
-.web-style-results li a:hover { color: var(--accent); }
-.web-style-results li p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.outfit-ai-preview { max-width: 760px; margin-top: 28px; padding: 18px; border: 1px solid var(--line); background: #171716; }
+.outfit-ai-preview .section-heading { margin-bottom: 13px; }
+.outfit-image-status { margin: 0 0 13px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.outfit-ai-image { display: block; width: min(100%, 480px); max-height: 640px; margin: 0 auto; border: 1px solid var(--line); background: #242320; object-fit: contain; }
+.outfit-ai-preview [data-outfit-image-trigger] { margin-top: 10px; }
+.web-image-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.web-image-card { min-width: 0; padding: 8px; border: 1px solid var(--line); background: #111110; }
+.web-image-card > a:first-child { display: block; overflow: hidden; background: #242320; }
+.web-image-card img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; transition: transform .2s ease; }
+.web-image-card > a:first-child:hover img { transform: scale(1.03); }
+.web-image-card p { margin: 8px 0 5px; overflow-wrap: anywhere; color: var(--ink); font-size: 10px; line-height: 1.45; }
+.web-image-card small { color: var(--muted); font-size: 8px; line-height: 1.6; }
+.web-image-card small a { color: var(--accent); }
+.web-image-card small a:hover { text-decoration: underline; }
 .pwa-install-button { position: fixed; z-index: 25; right: 20px; bottom: 20px; min-height: 44px; padding: 0 18px; border: 1px solid var(--accent); color: #171614; background: var(--accent); cursor: pointer; font-size: 11px; font-weight: 600; box-shadow: 0 8px 26px rgba(0,0,0,.35); }
 .pwa-install-button[hidden] { display: none; }
 
@@ -487,6 +496,9 @@ a.side-link:hover, .side-link.active { color: var(--ink); background: rgba(240,2
     .detail-actions .button { min-height: 40px; }
     .outfit-filter-fields, .outfit-selection-grid { grid-template-columns: 1fr; }
     .outfit-card { padding: 14px; }
+    .outfit-ai-preview, .web-style-results { padding: 13px; }
+    .web-image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .web-image-card { padding: 6px; }
     .pwa-install-button { right: 14px; bottom: 73px; }
 }
 

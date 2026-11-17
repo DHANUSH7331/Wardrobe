@@ -16,12 +16,13 @@
                 <div>
                     <p class="eyebrow"><span class="eyebrow-line"></span> Styled from what you own</p>
                     <h1 class="page-title">Outfit ideas</h1>
-                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. OpenRouter ranks outfit combinations using clothing details and live web references; photos and account details are not sent.</p>
+                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. OpenRouter ranks outfit combinations using clothing details and live web references. If you generate an AI preview, the selected wardrobe photos are sent to OpenRouter; account details are not.</p>
                 </div>
                 <a class="button button-outline" href="{% url 'saved_outfits' %}">Saved outfits <span aria-hidden="true">↗</span></a>
             </div>
 
             <form class="filter-form outfit-filter" method="get">
+                <input type="hidden" name="generate_image" value="1">
                 <div class="filter-fields outfit-filter-fields">
                     <div class="field">
                         <label for="outfit-occasion">Occasion</label>
@@ -130,29 +131,75 @@
                     <p>Choose an occasion or season to get combinations from the pieces already in your wardrobe.</p>
                 </div>
             {% endif %}
+            {% if has_generated and outfit_image_item_ids %}
+                <section
+                    class="outfit-ai-preview"
+                    data-outfit-image-generator
+                    data-url="{% url 'outfit_image_generate' %}"
+                    data-item-ids="{{ outfit_image_item_ids|join:',' }}"
+                    data-auto-generate="{{ auto_generate_image|yesno:'true,false' }}"
+                    data-occasion="{{ form.cleaned_data.occasion|default:'' }}"
+                    data-season="{{ form.cleaned_data.season|default:'' }}"
+                    data-style="{{ form.cleaned_data.style|default:'' }}"
+                >
+                    {% csrf_token %}
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow"><span class="eyebrow-line"></span> AI outfit preview</p>
+                            <h2>Men’s look based on your garment</h2>
+                        </div>
+                    </div>
+                    <p class="outfit-image-status" data-outfit-image-status aria-live="polite">
+                        {% if auto_generate_image %}
+                            Preparing a men’s outfit image from your selected wardrobe piece…
+                        {% else %}
+                            Generate an image based on the wardrobe pieces from your last search.
+                        {% endif %}
+                    </p>
+                    <img
+                        class="outfit-ai-image"
+                        data-outfit-image-result
+                        alt="AI-generated men's outfit based on your selected wardrobe piece"
+                        loading="lazy"
+                        hidden
+                    >
+                    <button class="button button-outline button-small" type="button" data-outfit-image-trigger {% if auto_generate_image %}hidden{% endif %}>Generate image</button>
+                    <p class="outfit-method-note">One AI image uses OpenRouter credits. Selected wardrobe photos are sent to OpenRouter to create the preview.</p>
+                </section>
+            {% endif %}
             {% if show_web_results %}
                 <section class="web-style-results">
                     <div class="section-heading">
                         <div>
-                            <p class="eyebrow"><span class="eyebrow-line"></span> Web outfit inspiration</p>
-                            <h2>Style references</h2>
+                            <p class="eyebrow"><span class="eyebrow-line"></span> Men’s outfit photos</p>
+                            <h2>Web image inspiration</h2>
                         </div>
                     </div>
+                    {% if web_image_error %}
+                        <p class="outfit-method-note">{{ web_image_error }}</p>
+                    {% elif web_image_results %}
+                        <div class="web-image-grid">
+                            {% for image in web_image_results %}
+                                <article class="web-image-card">
+                                    <a href="{{ image.source_url }}" target="_blank" rel="noopener noreferrer">
+                                        <img src="{{ image.thumbnail_url }}" alt="{{ image.title }}" loading="lazy" referrerpolicy="no-referrer">
+                                    </a>
+                                    <p>{{ image.title }}</p>
+                                    <small>
+                                        By {{ image.creator }} ·
+                                        <a href="{{ image.license_url }}" target="_blank" rel="noopener noreferrer">CC {{ image.license }}</a>
+                                        · <a href="{{ image.source_url }}" target="_blank" rel="noopener noreferrer">Source</a>
+                                    </small>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="outfit-method-note">No licensed men’s outfit photos were found for this garment. Your wardrobe-based suggestions are still available.</p>
+                    {% endif %}
                     {% if web_search_error %}
                         <p class="outfit-method-note">{{ web_search_error }}</p>
-                    {% elif web_results %}
-                        <ul>
-                            {% for result in web_results %}
-                                <li>
-                                    <a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.title }} <span aria-hidden="true">↗</span></a>
-                                    {% if result.snippet %}<p>{{ result.snippet }}</p>{% endif %}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="outfit-method-note">No web results were found for this look. Your wardrobe-based suggestions are still available.</p>
                     {% endif %}
-                    <p class="outfit-method-note">Web results are styling references, not product recommendations. Complete wardrobe looks use pieces already in your collection.</p>
+                    <p class="outfit-method-note">Web photos are embedded directly; source and Creative Commons attribution are provided with each image.</p>
                 </section>
             {% endif %}
         </section>

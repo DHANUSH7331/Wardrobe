@@ -38,9 +38,15 @@ from .services.ai_outfit_stylist import (
     rank_outfits,
 )
 from .services.outfit_recommender import generate_outfits
+from .services.outfit_image_generator import (
+    MAX_REFERENCE_ITEMS,
+    OutfitImageGenerationError,
+    generate_mens_outfit_image,
+)
 from .storage import image_storage_configured
 from .services.web_style_search import (
     WebStyleSearchError,
+    search_mens_outfit_images,
     search_style_guidance,
 )
 from .validators import validate_clothing_image
@@ -178,7 +184,9 @@ def outfit_generator(request):
     recommendations = []
     selected_items = []
     web_results = []
+    web_image_results = []
     web_search_error = ''
+    web_image_error = ''
     web_search_attempted = False
     ai_error = ''
     ai_used = False
@@ -208,6 +216,14 @@ def outfit_generator(request):
                     )
                 except WebStyleSearchError as error:
                     web_search_error = str(error)
+                try:
+                    web_image_results = search_mens_outfit_images(
+                        {'items': inspiration_items},
+                        occasion=form.cleaned_data['occasion'],
+                        season=form.cleaned_data['season'],
+                    )
+                except WebStyleSearchError as error:
+                    web_image_error = str(error)
             if recommendations:
                 try:
                     recommendations = rank_outfits(
@@ -222,6 +238,23 @@ def outfit_generator(request):
                 except AIOutfitStylingError as error:
                     ai_error = str(error)
 
+    image_reference_items = []
+    if has_generated:
+        image_reference_candidates = list(selected_items)
+        if recommendations:
+            image_reference_candidates.extend(recommendations[0]['items'])
+        elif not image_reference_candidates:
+            image_reference_candidates.extend(
+                wardrobe_items[:MAX_REFERENCE_ITEMS]
+            )
+        seen_item_ids = set()
+        for item in image_reference_candidates:
+            if item.pk in seen_item_ids:
+                continue
+            seen_item_ids.add(item.pk)
+            image_reference_items.append(item)
+            if len(image_reference_items) == MAX_REFERENCE_ITEMS:
+                break
     return render(
         request,
         'wardrobe/outfit_generator.html',
@@ -233,11 +266,72 @@ def outfit_generator(request):
             'selected_item_ids': {item.pk for item in selected_items},
             'web_results': web_results,
             'web_search_error': web_search_error,
+            'web_image_results': web_image_results,
+            'web_image_error': web_image_error,
             'show_web_results': bool(recommendations or web_search_attempted),
             'ai_error': ai_error,
             'ai_used': ai_used,
+            'outfit_image_item_ids': [
+                item.pk for item in image_reference_items[:MAX_REFERENCE_ITEMS]
+            ],
+            'auto_generate_image': request.GET.get('generate_image') == '1',
         },
     )
+
+
+@login_required
+@require_POST
+def outfit_image_generate(request):
+    raw_item_ids = request.POST.getlist('item_ids')
+    if not 1 <= len(raw_item_ids) <= MAX_REFERENCE_ITEMS:
+        return JsonResponse(
+            {'error': 'Select one to three wardrobe pieces for the outfit image.'},
+            status=400,
+        )
+    try:
+        item_ids = [int(item_id) for item_id in raw_item_ids]
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid wardrobe piece selection.'}, status=400)
+    if len(set(item_ids)) != len(item_ids) or any(item_id < 1 for item_id in item_ids):
+        return JsonResponse({'error': 'Invalid wardrobe piece selection.'}, status=400)
+
+    owned_items = {
+        item.pk: item
+        for item in ClothingItem.objects.filter(
+            user=request.user,
+            pk__in=item_ids,
+        )
+    }
+    if len(owned_items) != len(item_ids):
+        raise Http404
+
+    preferences = OutfitGenerationForm(
+        {
+            'occasion': request.POST.get('occasion', ''),
+            'season': request.POST.get('season', ''),
+            'style': request.POST.get('style', ''),
+        },
+        items=ClothingItem.objects.filter(user=request.user),
+    )
+    if not preferences.is_valid():
+        return JsonResponse(
+            {'error': 'Choose a valid occasion, season, and style.'},
+            status=400,
+        )
+
+    try:
+        image_data_url = generate_mens_outfit_image(
+            [owned_items[item_id] for item_id in item_ids],
+            occasion=preferences.cleaned_data['occasion'],
+            season=preferences.cleaned_data['season'],
+            style=preferences.cleaned_data['style'],
+        )
+    except OutfitImageGenerationError as error:
+        return JsonResponse(
+            {'error': str(error), 'retryable': error.retryable},
+            status=error.status_code,
+        )
+    return JsonResponse({'image_data_url': image_data_url})
 
 
 @login_required

@@ -1,9 +1,9 @@
-const CACHE_NAME = 'atelier-shell-v5';
+const CACHE_NAME = 'atelier-shell-v6';
 const OFFLINE_URL = '/static/wardrobe/offline.html';
 const SHELL_URLS = [
     OFFLINE_URL,
     '/static/wardrobe/css/style.css',
-    '/static/wardrobe/js/app.js?v=20261117-upload-fix',
+    '/static/wardrobe/js/app.js?v=20261117-outfit-images',
     '/static/wardrobe/icons/favicon.svg',
     '/static/wardrobe/icons/icon-192.png',
     '/static/wardrobe/icons/icon-512.png',
