@@ -19,8 +19,25 @@ def _provider_error_detail(error):
     """Extract a short provider explanation without exposing request secrets."""
     try:
         payload = json.loads(error.read().decode('utf-8', errors='replace'))
-        detail = payload.get('error', {}).get('message', '')
-        if isinstance(detail, str):
+        if not isinstance(payload, dict):
+            return ''
+        provider_error = payload.get('error')
+        if isinstance(provider_error, dict):
+            details = [
+                provider_error.get(key)
+                for key in ('message', 'type', 'code')
+                if isinstance(provider_error.get(key), str)
+            ]
+        elif isinstance(provider_error, str):
+            details = [provider_error]
+        else:
+            details = [
+                payload.get('message')
+                if isinstance(payload.get('message'), str)
+                else ''
+            ]
+        detail = ' '.join(value.strip() for value in details if value.strip())
+        if detail:
             return ' '.join(detail.split())[:500]
     except (AttributeError, json.JSONDecodeError, TypeError, UnicodeDecodeError):
         pass
@@ -126,8 +143,11 @@ def analyze_clothing(image_file):
             ) from error
         if error.code == 403:
             raise ImageAnalysisError(
-                'The vision API denied this request (403). Check the API key '
-                'project permissions, model access, and spend limits.'
+                'Groq denied access to the configured vision model (403). '
+                'Verify that GROQ_API_KEY in the Vercel Production environment '
+                'has permission to use GROQ_VISION_MODEL, then redeploy. '
+                'This is a provider permission error, not an image upload or '
+                'storage failure.'
                 + (f' Details: {detail}' if detail else '')
             ) from error
         raise ImageAnalysisError(

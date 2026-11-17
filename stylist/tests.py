@@ -2,6 +2,7 @@ import json
 import os
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from urllib.error import HTTPError
 from unittest.mock import patch
 
 from PIL import Image
@@ -951,3 +952,39 @@ class ImageAnalyzerTests(TestCase):
             'data:image/png;base64,',
             request_data['messages'][0]['content'][1]['image_url']['url'],
         )
+
+    def test_groq_forbidden_response_explains_configuration_and_provider_code(self):
+        response_body = json.dumps(
+            {
+                'error': {
+                    'message': 'Model access is not enabled',
+                    'type': 'permission_error',
+                    'code': 'model_access_denied',
+                }
+            }
+        ).encode('utf-8')
+        http_error = HTTPError(
+            'https://api.groq.com/openai/v1/chat/completions',
+            403,
+            'Forbidden',
+            {},
+            BytesIO(response_body),
+        )
+
+        with (
+            patch.dict(os.environ, {'GROQ_API_KEY': 'test-key'}),
+            patch(
+                'stylist.services.image_analyzer.urlopen',
+                side_effect=http_error,
+            ),
+        ):
+            with self.assertRaises(ImageAnalysisError) as error:
+                analyze_clothing(self.make_image())
+
+        self.assertIn(
+            'GROQ_API_KEY in the Vercel Production environment',
+            str(error.exception),
+        )
+        self.assertIn('GROQ_VISION_MODEL', str(error.exception))
+        self.assertIn('Model access is not enabled', str(error.exception))
+        self.assertIn('model_access_denied', str(error.exception))
