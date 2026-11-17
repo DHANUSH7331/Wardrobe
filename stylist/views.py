@@ -179,6 +179,7 @@ def outfit_generator(request):
     selected_items = []
     web_results = []
     web_search_error = ''
+    web_search_attempted = False
     ai_error = ''
     ai_used = False
     has_generated = False
@@ -194,14 +195,20 @@ def outfit_generator(request):
                 preferred_item_ids=(item.pk for item in selected_items),
             )
             if recommendations:
+                inspiration_items = recommendations[0]['items']
+            else:
+                inspiration_items = selected_items or list(wardrobe_items[:3])
+            if inspiration_items:
+                web_search_attempted = True
                 try:
                     web_results = search_style_guidance(
-                        recommendations[0],
+                        {'items': inspiration_items},
                         occasion=form.cleaned_data['occasion'],
                         season=form.cleaned_data['season'],
                     )
                 except WebStyleSearchError as error:
                     web_search_error = str(error)
+            if recommendations:
                 try:
                     recommendations = rank_outfits(
                         recommendations,
@@ -226,6 +233,7 @@ def outfit_generator(request):
             'selected_item_ids': {item.pk for item in selected_items},
             'web_results': web_results,
             'web_search_error': web_search_error,
+            'show_web_results': bool(recommendations or web_search_attempted),
             'ai_error': ai_error,
             'ai_used': ai_used,
         },

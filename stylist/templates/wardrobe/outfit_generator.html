@@ -116,10 +116,25 @@
                 {% elif ai_error %}
                     <p class="outfit-ai-warning">{{ ai_error }} The displayed order and explanations are rule-based; no AI ranking was applied.</p>
                 {% endif %}
+            {% elif has_generated %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">◇</span>
+                    <h2>Not enough pieces for a full wardrobe outfit</h2>
+                    <p>Web outfit inspiration is shown below. To build complete looks from your wardrobe, add compatible pieces such as a top and trousers or a dress and shoes.</p>
+                    <a class="button button-outline" href="{% url 'wardrobe' %}">View your wardrobe <span aria-hidden="true">↗</span></a>
+                </div>
+            {% else %}
+                <div class="empty-state compact-empty">
+                    <span class="empty-mark" aria-hidden="true">✧</span>
+                    <h2>Your wardrobe, styled together</h2>
+                    <p>Choose an occasion or season to get combinations from the pieces already in your wardrobe.</p>
+                </div>
+            {% endif %}
+            {% if show_web_results %}
                 <section class="web-style-results">
                     <div class="section-heading">
                         <div>
-                            <p class="eyebrow"><span class="eyebrow-line"></span> Live web search</p>
+                            <p class="eyebrow"><span class="eyebrow-line"></span> Web outfit inspiration</p>
                             <h2>Style references</h2>
                         </div>
                     </div>
@@ -137,21 +152,8 @@
                     {% else %}
                         <p class="outfit-method-note">No web results were found for this look. Your wardrobe-based suggestions are still available.</p>
                     {% endif %}
-                    <p class="outfit-method-note">Web results are styling references. Garment descriptions—not photos—are sent to OpenRouter when it ranks these looks.</p>
+                    <p class="outfit-method-note">Web results are styling references, not product recommendations. Complete wardrobe looks use pieces already in your collection.</p>
                 </section>
-            {% elif has_generated %}
-                <div class="empty-state">
-                    <span class="empty-mark" aria-hidden="true">◇</span>
-                    <h2>Not enough matching pieces yet</h2>
-                    <p>Add at least two compatible pieces, such as a top and trousers, or a dress and shoes. Your existing wardrobe items are used automatically.</p>
-                    <a class="button button-outline" href="{% url 'wardrobe' %}">View your wardrobe <span aria-hidden="true">↗</span></a>
-                </div>
-            {% else %}
-                <div class="empty-state compact-empty">
-                    <span class="empty-mark" aria-hidden="true">✧</span>
-                    <h2>Your wardrobe, styled together</h2>
-                    <p>Choose an occasion or season to get combinations from the pieces already in your wardrobe.</p>
-                </div>
             {% endif %}
         </section>
         <footer class="dashboard-footer">

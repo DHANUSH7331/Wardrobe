@@ -637,6 +637,49 @@ class OutfitWorkflowTests(TestCase):
             rf'value="{shirt.pk}"\s+checked',
         )
 
+    def test_single_wardrobe_piece_still_gets_web_inspiration(self):
+        shirt = self.make_item(
+            self.user,
+            'Black shirt',
+            ClothingItem.Category.SHIRT,
+            'Black',
+        )
+        web_results = [
+            {
+                'title': 'How to style a black shirt',
+                'snippet': 'Pair it with neutral trousers.',
+                'url': 'https://example.test/black-shirt',
+            }
+        ]
+
+        with (
+            patch(
+                'stylist.views.search_style_guidance',
+                return_value=web_results,
+            ) as search,
+            patch('stylist.views.rank_outfits') as rank,
+        ):
+            response = self.client.get(
+                reverse('outfit_generator'),
+                {
+                    'occasion': 'Casual outing',
+                    'season': 'Summer',
+                    'style': 'casual',
+                    'selected_items': [str(shirt.pk)],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['recommendations'], [])
+        self.assertTrue(response.context['show_web_results'])
+        self.assertEqual(
+            search.call_args.args[0]['items'],
+            [shirt],
+        )
+        rank.assert_not_called()
+        self.assertContains(response, 'Not enough pieces for a full wardrobe outfit')
+        self.assertContains(response, 'How to style a black shirt')
+
     def test_ai_stylist_only_reorders_supplied_looks_and_sends_no_photos(self):
         shirt = self.make_item(
             self.user,
@@ -846,7 +889,7 @@ class OutfitWorkflowTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Live web search')
+        self.assertContains(response, 'Web outfit inspiration')
         self.assertContains(response, 'How to style dark denim')
         search.assert_called_once()
         rank.assert_called_once()
