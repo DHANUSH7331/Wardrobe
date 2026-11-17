@@ -125,7 +125,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                 });
-                const result = await response.json();
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error('The image service returned an unreadable response.');
+                }
                 if (!response.ok) throw new Error(result.error || 'AI analysis did not finish.');
                 message.textContent = 'Analysis complete. Updating clothing details…';
                 window.location.replace(window.location.pathname);

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import os
 from io import BytesIO
@@ -117,7 +118,14 @@ def generate_mens_outfit_image(
 
     try:
         with urlopen(request, timeout=timeout) as response:
-            response_data = json.loads(response.read().decode('utf-8'))
+            response_bytes = response.read(
+                MAX_IMAGE_RESPONSE_BYTES * 4 // 3 + 64_001
+            )
+        if len(response_bytes) > MAX_IMAGE_RESPONSE_BYTES * 4 // 3 + 64_000:
+            raise OutfitImageGenerationError(
+                'OpenRouter returned an image that is too large.'
+            )
+        response_data = json.loads(response_bytes.decode('utf-8'))
     except HTTPError as error:
         detail = _provider_error_detail(error)
         if error.code == 402:
@@ -170,7 +178,6 @@ def generate_mens_outfit_image(
     try:
         image = response_data['data'][0]
         image_base64 = image['b64_json']
-        media_type = image.get('media_type', 'image/jpeg')
     except (KeyError, IndexError, TypeError) as error:
         raise OutfitImageGenerationError(
             'OpenRouter returned an image in an unexpected format.'
@@ -179,30 +186,46 @@ def generate_mens_outfit_image(
     if (
         not isinstance(image_base64, str)
         or len(image_base64) > MAX_IMAGE_RESPONSE_BYTES * 4 // 3
-        or media_type not in {'image/jpeg', 'image/png', 'image/webp'}
     ):
         raise OutfitImageGenerationError(
             'OpenRouter returned an unsupported image format.'
         )
     try:
-        base64.b64decode(image_base64, validate=True)
-    except (ValueError, base64.binascii.Error) as error:
+        image_bytes = base64.b64decode(image_base64, validate=True)
+        with Image.open(BytesIO(image_bytes)) as generated_image:
+            media_type = Image.MIME.get(generated_image.format)
+            generated_image.verify()
+    except (
+        binascii.Error,
+        Image.DecompressionBombError,
+        OSError,
+        UnidentifiedImageError,
+        ValueError,
+    ) as error:
         raise OutfitImageGenerationError(
             'OpenRouter returned a corrupted image.'
         ) from error
+    if media_type not in {'image/jpeg', 'image/png', 'image/webp'}:
+        raise OutfitImageGenerationError(
+            'OpenRouter returned an unsupported image format.'
+        )
     return f'data:{media_type};base64,{image_base64}'
 
 
 def _optimized_reference(item):
     try:
         with item.image.open('rb') as image_file:
-            image_bytes = image_file.read()
-        with Image.open(BytesIO(image_bytes)) as source:
-            image = ImageOps.exif_transpose(source).convert('RGB')
-            image.thumbnail((768, 768), Image.Resampling.LANCZOS)
-            output = BytesIO()
-            image.save(output, format='JPEG', quality=75, optimize=True)
-    except (OSError, ValueError, UnidentifiedImageError) as error:
+            with Image.open(image_file) as source:
+                image = ImageOps.exif_transpose(source).convert('RGB')
+                image.thumbnail((768, 768), Image.Resampling.LANCZOS)
+                output = BytesIO()
+                image.save(output, format='JPEG', quality=75, optimize=True)
+    except (
+        Image.DecompressionBombError,
+        OSError,
+        UnidentifiedImageError,
+        ValueError,
+    ) as error:
         raise OutfitImageGenerationError(
             'A selected wardrobe photo could not be prepared for image generation.'
         ) from error

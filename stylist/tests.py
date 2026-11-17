@@ -1,7 +1,9 @@
+import base64
 import json
 import os
 from io import BytesIO
 from tempfile import TemporaryDirectory
+from urllib.parse import parse_qs, urlparse
 from urllib.error import HTTPError, URLError
 from unittest.mock import patch
 
@@ -18,7 +20,11 @@ from .services.image_analyzer import (
     analyze_clothing,
     is_configured,
 )
-from .services.web_style_search import search_style_guidance
+from .services.outfit_image_generator import generate_mens_outfit_image
+from .services.web_style_search import (
+    search_mens_outfit_images,
+    search_style_guidance,
+)
 from .validators import MAX_IMAGE_SIZE
 
 
@@ -559,6 +565,12 @@ class OutfitWorkflowTests(TestCase):
         self.user = User.objects.create_user(username='outfit-owner')
         self.other_user = User.objects.create_user(username='another-owner')
         self.client.force_login(self.user)
+        web_image_search = patch(
+            'stylist.views.search_mens_outfit_images',
+            return_value=[],
+        )
+        web_image_search.start()
+        self.addCleanup(web_image_search.stop)
 
     def make_image(self, name):
         content = BytesIO()
@@ -651,12 +663,26 @@ class OutfitWorkflowTests(TestCase):
                 'url': 'https://example.test/black-shirt',
             }
         ]
+        web_images = [
+            {
+                'title': 'Men’s casual outfit',
+                'thumbnail_url': 'https://images.example.test/look.jpg',
+                'source_url': 'https://example.test/look',
+                'creator': 'Style photographer',
+                'license': 'BY',
+                'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+            }
+        ]
 
         with (
             patch(
                 'stylist.views.search_style_guidance',
                 return_value=web_results,
             ) as search,
+            patch(
+                'stylist.views.search_mens_outfit_images',
+                return_value=web_images,
+            ) as image_search,
             patch('stylist.views.rank_outfits') as rank,
         ):
             response = self.client.get(
@@ -676,9 +702,14 @@ class OutfitWorkflowTests(TestCase):
             search.call_args.args[0]['items'],
             [shirt],
         )
+        self.assertEqual(
+            image_search.call_args.args[0]['items'],
+            [shirt],
+        )
         rank.assert_not_called()
         self.assertContains(response, 'Not enough pieces for a full wardrobe outfit')
-        self.assertContains(response, 'How to style a black shirt')
+        self.assertContains(response, 'Men’s casual outfit')
+        self.assertContains(response, 'https://images.example.test/look.jpg')
 
     def test_ai_stylist_only_reorders_supplied_looks_and_sends_no_photos(self):
         shirt = self.make_item(
@@ -853,7 +884,7 @@ class OutfitWorkflowTests(TestCase):
         self.assertRedirects(response, reverse('outfit_generator'))
         self.assertFalse(SavedOutfit.objects.exists())
 
-    def test_outfit_generation_shows_live_web_style_references(self):
+    def test_outfit_generation_shows_live_web_image_inspiration(self):
         self.make_item(
             self.user,
             'Black shirt',
@@ -877,7 +908,20 @@ class OutfitWorkflowTests(TestCase):
                         'snippet': 'Pair denim with a neutral top.',
                     }
                 ],
-            ) as search,
+            ),
+            patch(
+                'stylist.views.search_mens_outfit_images',
+                return_value=[
+                    {
+                        'title': 'Men’s dark denim outfit',
+                        'thumbnail_url': 'https://images.example.test/denim.jpg',
+                        'source_url': 'https://example.com/photo',
+                        'creator': 'Photographer',
+                        'license': 'BY',
+                        'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+                    }
+                ],
+            ) as image_search,
             patch(
                 'stylist.views.rank_outfits',
                 side_effect=lambda recommendations, *args, **kwargs: recommendations,
@@ -889,10 +933,231 @@ class OutfitWorkflowTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Web outfit inspiration')
-        self.assertContains(response, 'How to style dark denim')
-        search.assert_called_once()
+        self.assertContains(response, 'Men’s outfit photos')
+        self.assertContains(response, 'Men’s dark denim outfit')
+        self.assertContains(response, 'https://images.example.test/denim.jpg')
+        image_search.assert_called_once()
         rank.assert_called_once()
+
+    def test_outfit_image_generation_uses_selected_item_and_owns_images(self):
+        shirt = self.make_item(
+            self.user,
+            'Black shirt',
+            ClothingItem.Category.SHIRT,
+            'Black',
+        )
+        private_shoes = self.make_item(
+            self.other_user,
+            'Private sneakers',
+            ClothingItem.Category.SHOES,
+            'White',
+        )
+
+        with patch(
+            'stylist.views.generate_mens_outfit_image',
+            return_value='data:image/jpeg;base64,dGVzdA==',
+        ) as generate:
+            response = self.client.post(
+                reverse('outfit_image_generate'),
+                {
+                    'item_ids': [str(shirt.pk)],
+                    'occasion': 'Casual outing',
+                    'season': 'Summer',
+                    'style': 'casual',
+                },
+            )
+            private_response = self.client.post(
+                reverse('outfit_image_generate'),
+                {
+                    'item_ids': [str(private_shoes.pk)],
+                    'occasion': 'Casual outing',
+                    'season': 'Summer',
+                    'style': 'casual',
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()['image_data_url'],
+            'data:image/jpeg;base64,dGVzdA==',
+        )
+        self.assertEqual(private_response.status_code, 404)
+        generate.assert_called_once()
+        self.assertEqual(generate.call_args.args[0], [shirt])
+
+    def test_outfit_search_auto_image_uses_selected_piece_and_complementary_looks(self):
+        shirt = self.make_item(
+            self.user,
+            'Black shirt',
+            ClothingItem.Category.SHIRT,
+            'Black',
+        )
+        jeans = self.make_item(
+            self.user,
+            'Blue jeans',
+            ClothingItem.Category.JEANS,
+            'Blue',
+        )
+
+        with (
+            patch(
+                'stylist.views.generate_outfits',
+                return_value=[
+                    {
+                        'items': (shirt, jeans),
+                        'score': 70,
+                        'reasons': ['A casual pairing.'],
+                    }
+                ],
+            ),
+            patch('stylist.views.search_style_guidance', return_value=[]),
+            patch(
+                'stylist.views.rank_outfits',
+                side_effect=lambda recommendations, *args, **kwargs: recommendations,
+            ),
+        ):
+            response = self.client.get(
+                reverse('outfit_generator'),
+                {
+                    'occasion': 'Casual outing',
+                    'season': 'Summer',
+                    'style': 'casual',
+                    'selected_items': [str(shirt.pk)],
+                    'generate_image': '1',
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['outfit_image_item_ids'],
+            [shirt.pk, jeans.pk],
+        )
+        self.assertTrue(response.context['auto_generate_image'])
+        self.assertContains(response, 'data-outfit-image-generator')
+        self.assertContains(response, 'data-auto-generate="true"')
+
+    def test_outfit_image_generator_sends_reference_photos_to_openrouter(self):
+        shirt = self.make_item(
+            self.user,
+            'Black shirt',
+            ClothingItem.Category.SHIRT,
+            'Black',
+        )
+        generated_image = BytesIO()
+        Image.new('RGB', (2, 2), color=(100, 120, 140)).save(
+            generated_image,
+            format='JPEG',
+        )
+        generated_image_base64 = base64.b64encode(
+            generated_image.getvalue()
+        ).decode('ascii')
+        response = BytesIO(
+            json.dumps(
+                {
+                    'data': [
+                        {
+                            'b64_json': generated_image_base64,
+                            'media_type': 'image/jpeg',
+                        }
+                    ]
+                }
+            ).encode('utf-8')
+        )
+
+        with (
+            patch.dict(os.environ, {'OPENROUTER_IMAGE_MODEL': 'test/image-model'}),
+            patch(
+                'stylist.services.outfit_image_generator.openrouter_config',
+                return_value=('test-key', 'qwen/qwen3.7-flash'),
+            ),
+            patch(
+                'stylist.services.outfit_image_generator.urlopen',
+                return_value=response,
+            ) as open_url,
+        ):
+            image_data_url = generate_mens_outfit_image(
+                [shirt],
+                occasion='Casual outing',
+                season='Summer',
+                style='casual',
+            )
+
+        request = open_url.call_args.args[0]
+        payload = json.loads(request.data.decode('utf-8'))
+        self.assertEqual(
+            image_data_url,
+            f'data:image/jpeg;base64,{generated_image_base64}',
+        )
+        self.assertEqual(payload['model'], 'test/image-model')
+        self.assertEqual(payload['n'], 1)
+        self.assertEqual(len(payload['input_references']), 1)
+        self.assertTrue(
+            payload['input_references'][0]['image_url']['url'].startswith(
+                'data:image/jpeg;base64,'
+            )
+        )
+        self.assertIn('adult male model', payload['prompt'])
+        self.assertEqual(payload['provider']['data_collection'], 'deny')
+
+    def test_web_image_search_filters_license_gender_and_unsafe_urls(self):
+        payload = {
+            'results': [
+                {
+                    'title': 'Men’s streetwear outfit',
+                    'creator': 'Photographer',
+                    'license': 'by',
+                    'thumbnail': 'https://images.example.test/mens.jpg',
+                    'foreign_landing_url': 'https://example.test/mens',
+                    'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+                    'tags': [],
+                },
+                {
+                    'title': 'Women’s outfit',
+                    'creator': 'Photographer',
+                    'license': 'by',
+                    'thumbnail': 'https://images.example.test/womens.jpg',
+                    'foreign_landing_url': 'https://example.test/womens',
+                    'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+                    'tags': [],
+                },
+                {
+                    'title': 'Male style photo',
+                    'creator': 'Photographer',
+                    'license': 'by-nc',
+                    'thumbnail': 'https://images.example.test/unlicensed.jpg',
+                    'foreign_landing_url': 'https://example.test/unlicensed',
+                    'license_url': 'https://creativecommons.org/licenses/by-nc/4.0/',
+                    'tags': [],
+                },
+                {
+                    'title': 'Menswear inspiration',
+                    'creator': 'Photographer',
+                    'license': 'cc0',
+                    'thumbnail': 'http://images.example.test/insecure.jpg',
+                    'foreign_landing_url': 'https://example.test/insecure',
+                    'license_url': 'https://creativecommons.org/publicdomain/zero/1.0/',
+                    'tags': [],
+                },
+            ]
+        }
+        response = BytesIO(json.dumps(payload).encode('utf-8'))
+
+        with patch(
+            'stylist.services.web_style_search.urlopen',
+            return_value=response,
+        ) as open_url:
+            results = search_mens_outfit_images(
+                {'items': []},
+                occasion='Casual outing',
+                season='Summer',
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['title'], 'Men’s streetwear outfit')
+        self.assertEqual(results[0]['license'], 'BY')
+        request = open_url.call_args.args[0]
+        query = parse_qs(urlparse(request.full_url).query)
+        self.assertIn('by,by-sa,cc0', query['license'])
 
     def test_web_search_extracts_safe_search_result_links(self):
         response = BytesIO(

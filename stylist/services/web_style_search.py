@@ -159,6 +159,10 @@ def search_mens_outfit_images(recommendation, occasion='', season=''):
             'Web image search returned an unreadable response.'
         ) from error
 
+    if not isinstance(payload, dict):
+        raise WebStyleSearchError(
+            'Web image search returned an unexpected response.'
+        )
     results = payload.get('results')
     if not isinstance(results, list):
         raise WebStyleSearchError(
@@ -171,10 +175,20 @@ def search_mens_outfit_images(recommendation, occasion='', season=''):
             continue
         license_name = result.get('license')
         title = result.get('title')
-        creator = result.get('creator') or 'Unknown creator'
+        creator = result.get('creator')
         tags = result.get('tags')
-        if not isinstance(title, str) or license_name not in OPENVERSE_LICENSES:
+        if (
+            not isinstance(title, str)
+            or not isinstance(license_name, str)
+            or license_name not in OPENVERSE_LICENSES
+        ):
             continue
+        if not isinstance(creator, str) and creator is not None:
+            continue
+        if license_name in {'by', 'by-sa'} and not creator:
+            continue
+        if not isinstance(tags, list):
+            tags = []
         if not _is_menswear_result(title, creator, tags):
             continue
 
@@ -191,7 +205,7 @@ def search_mens_outfit_images(recommendation, occasion='', season=''):
                 'title': title[:160],
                 'thumbnail_url': thumbnail_url,
                 'source_url': source_url,
-                'creator': str(creator)[:120],
+                'creator': (creator or 'Unknown creator')[:120],
                 'license': str(license_name).upper(),
                 'license_url': license_url,
             }
@@ -216,5 +230,8 @@ def _is_menswear_result(title, creator, tags):
 
 
 def _is_safe_url(value):
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
     return parsed.scheme == 'https' and bool(parsed.netloc)
