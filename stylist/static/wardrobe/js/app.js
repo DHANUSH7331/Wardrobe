@@ -1,7 +1,7 @@
 (() => {
     const MAX_UPLOAD_BYTES = 3_500_000;
     const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
-    const MAX_IMAGE_EDGE = 1600;
+    const MAX_IMAGE_EDGE = 1280;
 
     function canvasBlob(canvas, quality) {
         return new Promise((resolve, reject) => {
@@ -22,7 +22,13 @@
 
         let bitmap;
         try {
-            bitmap = await createImageBitmap(file);
+            // Ask the browser's image decoder to downsample before exposing a
+            // full-size bitmap to JavaScript. Phone photos can be 12–50 MP;
+            // decoding those at native size can freeze or kill the PWA tab.
+            bitmap = await createImageBitmap(file, {
+                resizeWidth: MAX_IMAGE_EDGE,
+                resizeQuality: 'low',
+            });
             const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height));
             let width = Math.max(1, Math.round(bitmap.width * scale));
             let height = Math.max(1, Math.round(bitmap.height * scale));
@@ -35,7 +41,7 @@
                 canvas.width = width;
                 canvas.height = height;
                 context.drawImage(bitmap, 0, 0, width, height);
-                const quality = Math.max(0.5, 0.82 - pass * 0.08);
+                const quality = Math.max(0.5, 0.78 - pass * 0.07);
                 blob = await canvasBlob(canvas, quality);
                 if (blob.size <= MAX_UPLOAD_BYTES) break;
                 width = Math.max(1, Math.round(width * 0.8));
@@ -132,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 imagePlaceholder.hidden = true;
                 submittingOptimized = true;
                 if (imageFeedback) imageFeedback.textContent = 'Photo optimized; uploading…';
-                form.requestSubmit(event.submitter || undefined);
+                if (event.submitter) form.requestSubmit(event.submitter);
+                else form.requestSubmit();
             } catch (error) {
                 if (imageFeedback) imageFeedback.textContent = error.message;
                 if (submitButton) submitButton.disabled = false;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'atelier-shell-v3';
+const CACHE_NAME = 'atelier-shell-v4';
 const OFFLINE_URL = '/static/wardrobe/offline.html';
 const SHELL_URLS = [
     OFFLINE_URL,

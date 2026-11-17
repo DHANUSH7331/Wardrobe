@@ -266,9 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let offset = 0; offset < files.length; offset += chunkSize) {
                 const chunk = files.slice(offset, offset + chunkSize);
                 showFeedback(`Optimizing photo ${offset + 1} of ${files.length} on this device…`);
-                const optimizedFiles = await Promise.all(
-                    chunk.map((file) => window.AtelierImageTools.optimizeImage(file)),
-                );
+                // Keep only one decoded image in memory at a time. This matters
+                // on phones even when the server upload chunk size is one.
+                const optimizedFiles = [];
+                for (const file of chunk) {
+                    optimizedFiles.push(await window.AtelierImageTools.optimizeImage(file));
+                }
                 const formData = new FormData();
                 formData.append('csrfmiddlewaretoken', csrfToken);
                 optimizedFiles.forEach((file) => formData.append('images', file));
