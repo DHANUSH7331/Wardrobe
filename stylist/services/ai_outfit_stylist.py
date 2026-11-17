@@ -1,6 +1,6 @@
 import json
 
-from .gemini_api import GeminiAPIError, generate_content, gemini_config
+from .openai_api import OpenAIAPIError, generate_content, openai_config
 
 
 class AIOutfitStylingError(Exception):
@@ -15,10 +15,10 @@ def rank_outfits(
     style='',
     selected_items=(),
 ):
-    api_key = gemini_config()[0]
+    api_key = openai_config()[0]
     if not api_key:
         raise AIOutfitStylingError(
-            'Gemini AI is not configured. Add GEMINI_API_KEY to your environment.'
+            'OpenAI is not configured. Add OPENAI_API_KEY to your environment.'
         )
 
     prompt = _build_prompt(
@@ -44,7 +44,7 @@ def rank_outfits(
             ),
             timeout=35,
         )
-    except GeminiAPIError as error:
+    except OpenAIAPIError as error:
         raise AIOutfitStylingError(
             f'{error} Showing wardrobe-based suggestions instead.'
         ) from error
@@ -52,7 +52,7 @@ def rank_outfits(
     ranking = _parse_ranking(content, len(recommendations))
     if not ranking:
         raise AIOutfitStylingError(
-            'Gemini returned no usable outfit ranking.'
+            'OpenAI returned no usable outfit ranking.'
         )
 
     ranked_recommendations = []
@@ -128,12 +128,12 @@ def _parse_ranking(content, recommendation_count):
         ranked = data['ranked']
     except (KeyError, TypeError, json.JSONDecodeError) as error:
         raise AIOutfitStylingError(
-            'Gemini returned outfit details in an unexpected format.'
+            'OpenAI returned outfit details in an unexpected format.'
         ) from error
 
     if not isinstance(ranked, list):
         raise AIOutfitStylingError(
-            'Gemini returned outfit details in an unexpected format.'
+            'OpenAI returned outfit details in an unexpected format.'
         )
 
     results = []

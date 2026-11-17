@@ -665,8 +665,8 @@ class OutfitWorkflowTests(TestCase):
 
         with (
             patch(
-                'stylist.services.ai_outfit_stylist.gemini_config',
-                return_value=('test-key', 'gemini-3.8-flash'),
+                'stylist.services.ai_outfit_stylist.openai_config',
+                return_value=('test-key', 'gpt-5.4-mini'),
             ),
             patch(
                 'stylist.services.ai_outfit_stylist.generate_content',
@@ -730,7 +730,7 @@ class OutfitWorkflowTests(TestCase):
             patch('stylist.views.search_style_guidance', return_value=[]),
             patch(
                 'stylist.views.rank_outfits',
-                side_effect=AIOutfitStylingError('Gemini is unavailable.'),
+                side_effect=AIOutfitStylingError('OpenAI is unavailable.'),
             ),
         ):
             response = self.client.get(
@@ -740,7 +740,7 @@ class OutfitWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context['ai_used'])
-        self.assertContains(response, 'Gemini is unavailable.')
+        self.assertContains(response, 'OpenAI is unavailable.')
         self.assertContains(response, 'no AI ranking was applied')
 
     def test_user_can_save_a_reviewed_look_and_other_users_cannot_access_it(self):
@@ -883,15 +883,19 @@ class ImageAnalyzerTests(TestCase):
             content_type='image/png',
         )
 
-    def test_groq_key_does_not_enable_gemini_analysis(self):
+    def test_groq_and_gemini_keys_do_not_enable_openai_analysis(self):
         with patch.dict(
             os.environ,
-            {'GEMINI_API_KEY': '', 'GROQ_API_KEY': 'legacy-key'},
+            {
+                'OPENAI_API_KEY': '',
+                'GEMINI_API_KEY': 'legacy-gemini-key',
+                'GROQ_API_KEY': 'legacy-groq-key',
+            },
             clear=True,
         ):
             self.assertFalse(is_configured())
 
-    def test_gemini_response_becomes_structured_clothing_attributes(self):
+    def test_openai_response_becomes_structured_clothing_attributes(self):
         response_text = json.dumps(
             {
                 'name': 'Blue denim jeans',
@@ -907,20 +911,20 @@ class ImageAnalyzerTests(TestCase):
             }
         )
         api_response = {
-            'candidates': [
-                {'content': {'parts': [{'text': response_text}]}}
+            'choices': [
+                {'message': {'content': response_text}}
             ]
         }
         with (
             patch.dict(
                 os.environ,
                 {
-                    'GEMINI_API_KEY': 'test-key',
-                    'GEMINI_MODEL': 'gemini-3.8-flash',
+                    'OPENAI_API_KEY': 'test-key',
+                    'OPENAI_MODEL': 'gpt-5.4-mini',
                 },
             ),
             patch(
-                'stylist.services.gemini_api.urlopen',
+                'stylist.services.openai_api.urlopen',
                 return_value=BytesIO(json.dumps(api_response).encode('utf-8')),
             ) as urlopen_mock,
         ):
@@ -930,48 +934,49 @@ class ImageAnalyzerTests(TestCase):
         request_data = json.loads(request.data)
         self.assertEqual(
             request.full_url,
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+            'https://api.openai.com/v1/chat/completions',
         )
-        self.assertEqual(request.get_header('X-goog-api-key'), 'test-key')
+        self.assertEqual(request.get_header('Authorization'), 'Bearer test-key')
+        self.assertEqual(request_data['model'], 'gpt-5.4-mini')
         self.assertEqual(
-            request_data['generationConfig']['responseMimeType'],
-            'application/json',
+            request_data['response_format'],
+            {'type': 'json_object'},
         )
         self.assertEqual(result['category'], ClothingItem.Category.JEANS)
         self.assertEqual(result['fit'], ClothingItem.Fit.BAGGY)
         self.assertEqual(result['material'], 'Denim')
         self.assertEqual(result['season'], 'Spring, Autumn')
         self.assertIn(
-            'inlineData',
-            request_data['contents'][0]['parts'][1],
+            'image_url',
+            request_data['messages'][0]['content'][1],
         )
         self.assertEqual(
-            request_data['contents'][0]['parts'][1]['inlineData']['mimeType'],
-            'image/png',
+            request_data['messages'][0]['content'][1]['image_url']['url'][:22],
+            'data:image/png;base64,',
         )
 
-    def test_gemini_forbidden_response_explains_configuration_and_request_id(self):
+    def test_openai_forbidden_response_explains_configuration_and_request_id(self):
         response_body = json.dumps(
             {
                 'error': {
-                    'message': 'API key does not have permission',
-                    'status': 'PERMISSION_DENIED',
-                    'code': 403,
+                    'message': 'Project does not have model access',
+                    'type': 'permission_error',
+                    'code': 'model_access_denied',
                 }
             }
         ).encode('utf-8')
         http_error = HTTPError(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+            'https://api.openai.com/v1/chat/completions',
             403,
             'Forbidden',
-            {'x-goog-request-id': 'req-test-123'},
+            {'x-request-id': 'req-test-123'},
             BytesIO(response_body),
         )
 
         with (
-            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.gemini_api.urlopen',
+                'stylist.services.openai_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -979,16 +984,16 @@ class ImageAnalyzerTests(TestCase):
                 analyze_clothing(self.make_image())
 
         self.assertIn(
-            'GEMINI_API_KEY',
+            'OPENAI_API_KEY',
             str(error.exception),
         )
-        self.assertIn('API key does not have permission', str(error.exception))
-        self.assertIn('PERMISSION_DENIED', str(error.exception))
+        self.assertIn('Project does not have model access', str(error.exception))
+        self.assertIn('model_access_denied', str(error.exception))
         self.assertIn('req-test-123', str(error.exception))
 
-    def test_gemini_rate_limit_remains_retryable(self):
+    def test_openai_rate_limit_remains_retryable(self):
         http_error = HTTPError(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+            'https://api.openai.com/v1/chat/completions',
             429,
             'Too Many Requests',
             {'Retry-After': '3'},
@@ -996,9 +1001,9 @@ class ImageAnalyzerTests(TestCase):
         )
 
         with (
-            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.gemini_api.urlopen',
+                'stylist.services.openai_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -1009,112 +1014,33 @@ class ImageAnalyzerTests(TestCase):
         self.assertEqual(error.exception.retry_after, 3.0)
         self.assertIn('Quota exceeded', str(error.exception))
 
-    def test_gemini_503_uses_the_flash_lite_fallback(self):
-        primary_error = HTTPError(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+    def test_openai_service_failure_remains_retryable(self):
+        http_error = HTTPError(
+            'https://api.openai.com/v1/chat/completions',
             503,
             'Unavailable',
             {},
-            BytesIO(b'{"error":{"message":"High demand","status":"UNAVAILABLE"}}'),
+            BytesIO(b'{"error":{"message":"Service unavailable"}}'),
         )
-        response_body = {
-            'candidates': [
-                {
-                    'content': {
-                        'parts': [
-                            {
-                                'text': json.dumps(
-                                    {
-                                        'name': 'White shirt',
-                                        'category': 'shirt',
-                                        'primary_color': 'White',
-                                    }
-                                )
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
 
         with (
-            patch.dict(
-                os.environ,
-                {
-                    'GEMINI_API_KEY': 'test-key',
-                    'GEMINI_MODEL': 'gemini-3.8-flash',
-                },
+            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
+            patch(
+                'stylist.services.openai_api.urlopen',
+                side_effect=http_error,
             ),
-            patch(
-                'stylist.services.gemini_api.urlopen',
-                side_effect=[
-                    primary_error,
-                    BytesIO(json.dumps(response_body).encode('utf-8')),
-                ],
-            ) as urlopen_mock,
         ):
-            result = analyze_clothing(self.make_image())
+            with self.assertRaises(ImageAnalysisError) as error:
+                analyze_clothing(self.make_image())
 
-        self.assertEqual(result['name'], 'White shirt')
-        self.assertEqual(urlopen_mock.call_count, 2)
-        fallback_request = urlopen_mock.call_args_list[1].args[0]
-        self.assertIn(
-            '/models/gemini-3.5-flash-lite:generateContent',
-            fallback_request.full_url,
-        )
+        self.assertTrue(error.exception.retryable)
+        self.assertIn('Service unavailable', str(error.exception))
 
-    def test_gemini_read_timeout_uses_the_flash_lite_fallback(self):
-        response_body = {
-            'candidates': [
-                {
-                    'content': {
-                        'parts': [
-                            {
-                                'text': json.dumps(
-                                    {
-                                        'name': 'White shirt',
-                                        'category': 'shirt',
-                                        'primary_color': 'White',
-                                    }
-                                )
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-
+    def test_openai_connection_failure_includes_safe_network_cause(self):
         with (
-            patch.dict(
-                os.environ,
-                {
-                    'GEMINI_API_KEY': 'test-key',
-                    'GEMINI_MODEL': 'gemini-3.8-flash',
-                },
-            ),
+            patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.gemini_api.urlopen',
-                side_effect=[
-                    TimeoutError('The read operation timed out'),
-                    BytesIO(json.dumps(response_body).encode('utf-8')),
-                ],
-            ) as urlopen_mock,
-        ):
-            result = analyze_clothing(self.make_image())
-
-        self.assertEqual(result['name'], 'White shirt')
-        self.assertEqual(urlopen_mock.call_count, 2)
-        fallback_request = urlopen_mock.call_args_list[1].args[0]
-        self.assertIn(
-            '/models/gemini-3.5-flash-lite:generateContent',
-            fallback_request.full_url,
-        )
-
-    def test_gemini_connection_failure_includes_safe_network_cause(self):
-        with (
-            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
-            patch(
-                'stylist.services.gemini_api.urlopen',
+                'stylist.services.openai_api.urlopen',
                 side_effect=URLError('Temporary DNS failure'),
             ),
         ):
