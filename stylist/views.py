@@ -528,7 +528,7 @@ def scan_process_photo(request, batch_id, photo_id):
         return JsonResponse(
             {
                 'error': (
-                    'AI is not configured. Add a GROQ_API_KEY, then resume this scan.'
+                    'AI is not configured. Add a GEMINI_API_KEY, then resume this scan.'
                 ),
                 'retryable': False,
             },

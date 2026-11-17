@@ -16,7 +16,7 @@
                 <div>
                     <p class="eyebrow"><span class="eyebrow-line"></span> Styled from what you own</p>
                     <h1 class="page-title">Outfit ideas</h1>
-                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. Groq ranks outfit combinations using clothing details and live web references; photos and account details are not sent.</p>
+                    <p class="dashboard-intro">Choose wardrobe pieces and styling filters. Gemini ranks outfit combinations using clothing details and live web references; photos and account details are not sent.</p>
                 </div>
                 <a class="button button-outline" href="{% url 'saved_outfits' %}">Saved outfits <span aria-hidden="true">↗</span></a>
             </div>
@@ -112,7 +112,7 @@
                     {% endfor %}
                 </div>
                 {% if ai_used %}
-                    <p class="outfit-method-note">Groq ranked these looks using your clothing details and available web references. The /100 score is a separate wardrobe compatibility score.</p>
+                    <p class="outfit-method-note">Gemini ranked these looks using your clothing details and available web references. The /100 score is a separate wardrobe compatibility score.</p>
                 {% elif ai_error %}
                     <p class="outfit-ai-warning">{{ ai_error }} The displayed order and explanations are rule-based; no AI ranking was applied.</p>
                 {% endif %}
@@ -137,7 +137,7 @@
                     {% else %}
                         <p class="outfit-method-note">No web results were found for this look. Your wardrobe-based suggestions are still available.</p>
                     {% endif %}
-                    <p class="outfit-method-note">Web results are styling references. Garment descriptions—not photos—are sent to Groq when it ranks these looks.</p>
+                    <p class="outfit-method-note">Web results are styling references. Garment descriptions—not photos—are sent to Gemini when it ranks these looks.</p>
                 </section>
             {% elif has_generated %}
                 <div class="empty-state">

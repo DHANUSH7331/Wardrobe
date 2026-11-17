@@ -654,31 +654,23 @@ class OutfitWorkflowTests(TestCase):
             {'items': (shirt, jeans), 'score': 70, 'reasons': ['Local reason']},
             {'items': (jeans, shirt), 'score': 65, 'reasons': ['Another reason']},
         ]
-        model_response = {
-            'choices': [
-                {
-                    'message': {
-                        'content': json.dumps(
-                            {
-                                'ranked': [
-                                    {'look': 2, 'reason': 'A relaxed color pairing.'},
-                                    {'look': 99, 'reason': 'Invented look.'},
-                                ]
-                            }
-                        )
-                    }
-                }
-            ]
-        }
+        model_response = json.dumps(
+            {
+                'ranked': [
+                    {'look': 2, 'reason': 'A relaxed color pairing.'},
+                    {'look': 99, 'reason': 'Invented look.'},
+                ]
+            }
+        )
 
         with (
             patch(
-                'stylist.services.ai_outfit_stylist.groq_config',
-                return_value=('test-key', 'https://api.example.test/chat', 'test-model'),
+                'stylist.services.ai_outfit_stylist.gemini_config',
+                return_value=('test-key', 'gemini-3.8-flash'),
             ),
             patch(
-                'stylist.services.ai_outfit_stylist.urlopen',
-                return_value=BytesIO(json.dumps(model_response).encode()),
+                'stylist.services.ai_outfit_stylist.generate_content',
+                return_value=model_response,
             ) as request_call,
         ):
             ranked = rank_outfits(
@@ -690,11 +682,11 @@ class OutfitWorkflowTests(TestCase):
         self.assertIs(ranked[0]['items'], recommendations[1]['items'])
         self.assertEqual(ranked[0]['reasons'], ['A relaxed color pairing.'])
         self.assertEqual(len(ranked), 2)
-        request_payload = json.loads(request_call.call_args.args[0].data)
-        prompt = request_payload['messages'][1]['content']
+        prompt = request_call.call_args.args[0]
         self.assertIn('Black shirt', prompt)
         self.assertIn('Use neutral colors.', prompt)
-        self.assertNotIn('data:image', prompt)
+        self.assertNotIn('image_bytes', request_call.call_args.kwargs)
+        self.assertIn('untrusted', request_call.call_args.kwargs['system_instruction'])
 
     def test_outfit_generation_rejects_selected_items_owned_by_another_user(self):
         shirt = self.make_item(
@@ -738,7 +730,7 @@ class OutfitWorkflowTests(TestCase):
             patch('stylist.views.search_style_guidance', return_value=[]),
             patch(
                 'stylist.views.rank_outfits',
-                side_effect=AIOutfitStylingError('Groq is unavailable.'),
+                side_effect=AIOutfitStylingError('Gemini is unavailable.'),
             ),
         ):
             response = self.client.get(
@@ -748,7 +740,7 @@ class OutfitWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context['ai_used'])
-        self.assertContains(response, 'Groq is unavailable.')
+        self.assertContains(response, 'Gemini is unavailable.')
         self.assertContains(response, 'no AI ranking was applied')
 
     def test_user_can_save_a_reviewed_look_and_other_users_cannot_access_it(self):
@@ -891,47 +883,44 @@ class ImageAnalyzerTests(TestCase):
             content_type='image/png',
         )
 
-    def test_openai_key_does_not_enable_groq_analysis(self):
+    def test_groq_key_does_not_enable_gemini_analysis(self):
         with patch.dict(
             os.environ,
-            {'GROQ_API_KEY': '', 'OPENAI_API_KEY': 'legacy-key'},
+            {'GEMINI_API_KEY': '', 'GROQ_API_KEY': 'legacy-key'},
             clear=True,
         ):
             self.assertFalse(is_configured())
 
-    def test_groq_response_becomes_structured_clothing_attributes(self):
+    def test_gemini_response_becomes_structured_clothing_attributes(self):
+        response_text = json.dumps(
+            {
+                'name': 'Blue denim jeans',
+                'category': 'jeans',
+                'primary_color': 'Indigo blue',
+                'secondary_color': '',
+                'pattern': 'plain',
+                'style': 'casual',
+                'fit': 'baggy',
+                'material': 'Denim',
+                'occasion': ['Casual outing'],
+                'season': ['Spring', 'Autumn'],
+            }
+        )
         api_response = {
-            'choices': [
-                {
-                    'message': {
-                        'content': json.dumps(
-                            {
-                                'name': 'Blue denim jeans',
-                                'category': 'jeans',
-                                'primary_color': 'Indigo blue',
-                                'secondary_color': '',
-                                'pattern': 'plain',
-                                'style': 'casual',
-                                'fit': 'baggy',
-                                'material': 'Denim',
-                                'occasion': ['Casual outing'],
-                                'season': ['Spring', 'Autumn'],
-                            }
-                        )
-                    }
-                }
+            'candidates': [
+                {'content': {'parts': [{'text': response_text}]}}
             ]
         }
         with (
             patch.dict(
                 os.environ,
                 {
-                    'GROQ_API_KEY': 'test-key',
-                    'GROQ_VISION_MODEL': 'qwen/qwen3.8-27b',
+                    'GEMINI_API_KEY': 'test-key',
+                    'GEMINI_MODEL': 'gemini-3.8-flash',
                 },
             ),
             patch(
-                'stylist.services.image_analyzer.urlopen',
+                'stylist.services.gemini_api.urlopen',
                 return_value=BytesIO(json.dumps(api_response).encode('utf-8')),
             ) as urlopen_mock,
         ):
@@ -941,40 +930,48 @@ class ImageAnalyzerTests(TestCase):
         request_data = json.loads(request.data)
         self.assertEqual(
             request.full_url,
-            'https://api.groq.com/openai/v1/chat/completions',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
         )
-        self.assertEqual(request_data['model'], 'qwen/qwen3.8-27b')
+        self.assertEqual(request.get_header('X-goog-api-key'), 'test-key')
+        self.assertEqual(
+            request_data['generationConfig']['responseMimeType'],
+            'application/json',
+        )
         self.assertEqual(result['category'], ClothingItem.Category.JEANS)
         self.assertEqual(result['fit'], ClothingItem.Fit.BAGGY)
         self.assertEqual(result['material'], 'Denim')
         self.assertEqual(result['season'], 'Spring, Autumn')
         self.assertIn(
-            'data:image/png;base64,',
-            request_data['messages'][0]['content'][1]['image_url']['url'],
+            'inlineData',
+            request_data['contents'][0]['parts'][1],
+        )
+        self.assertEqual(
+            request_data['contents'][0]['parts'][1]['inlineData']['mimeType'],
+            'image/png',
         )
 
-    def test_groq_forbidden_response_explains_configuration_and_provider_code(self):
+    def test_gemini_forbidden_response_explains_configuration_and_request_id(self):
         response_body = json.dumps(
             {
                 'error': {
-                    'message': 'Model access is not enabled',
-                    'type': 'permission_error',
-                    'code': 'model_access_denied',
+                    'message': 'API key does not have permission',
+                    'status': 'PERMISSION_DENIED',
+                    'code': 403,
                 }
             }
         ).encode('utf-8')
         http_error = HTTPError(
-            'https://api.groq.com/openai/v1/chat/completions',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
             403,
             'Forbidden',
-            {'x-groq-request-id': 'req-test-123'},
+            {'x-goog-request-id': 'req-test-123'},
             BytesIO(response_body),
         )
 
         with (
-            patch.dict(os.environ, {'GROQ_API_KEY': 'test-key'}),
+            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
             patch(
-                'stylist.services.image_analyzer.urlopen',
+                'stylist.services.gemini_api.urlopen',
                 side_effect=http_error,
             ),
         ):
@@ -982,11 +979,32 @@ class ImageAnalyzerTests(TestCase):
                 analyze_clothing(self.make_image())
 
         self.assertIn(
-            'GROQ_API_KEY in the Vercel Production environment',
+            'GEMINI_API_KEY',
             str(error.exception),
         )
-        self.assertIn('GROQ_VISION_MODEL', str(error.exception))
-        self.assertIn('Model access is not enabled', str(error.exception))
-        self.assertIn('model_access_denied', str(error.exception))
-        self.assertIn('qwen/qwen3.8-27b', str(error.exception))
+        self.assertIn('API key does not have permission', str(error.exception))
+        self.assertIn('PERMISSION_DENIED', str(error.exception))
         self.assertIn('req-test-123', str(error.exception))
+
+    def test_gemini_rate_limit_remains_retryable(self):
+        http_error = HTTPError(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+            429,
+            'Too Many Requests',
+            {'Retry-After': '3'},
+            BytesIO(b'{"error":{"message":"Quota exceeded"}}'),
+        )
+
+        with (
+            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
+            patch(
+                'stylist.services.gemini_api.urlopen',
+                side_effect=http_error,
+            ),
+        ):
+            with self.assertRaises(ImageAnalysisError) as error:
+                analyze_clothing(self.make_image())
+
+        self.assertTrue(error.exception.retryable)
+        self.assertEqual(error.exception.retry_after, 3.0)
+        self.assertIn('Quota exceeded', str(error.exception))
