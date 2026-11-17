@@ -18,11 +18,13 @@ class GeminiAPIError(Exception):
         retryable=False,
         retry_after=None,
         status_code=None,
+        fallback_eligible=False,
     ):
         super().__init__(message)
         self.retryable = retryable
         self.retry_after = retry_after
         self.status_code = status_code
+        self.fallback_eligible = fallback_eligible
 
 
 def gemini_config():
@@ -71,7 +73,7 @@ def generate_content(
         response_data = _request_model(api_key, model, payload, timeout)
     except GeminiAPIError as error:
         if (
-            error.status_code != 503
+            not error.fallback_eligible
             or model == GEMINI_FALLBACK_MODEL
         ):
             raise
@@ -130,6 +132,7 @@ def _request_model(api_key, model, payload, timeout):
                 + (f' Details: {detail}' if detail else ''),
                 retryable=True,
                 status_code=error.code,
+                fallback_eligible=error.code == 503,
             ) from error
         if error.code in (401, 403):
             raise GeminiAPIError(
@@ -151,6 +154,7 @@ def _request_model(api_key, model, payload, timeout):
             + (f' ({detail})' if detail else '')
             + '. Check the connection and try again.',
             retryable=True,
+            fallback_eligible=isinstance(reason, TimeoutError),
         ) from error
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
         raise GeminiAPIError(

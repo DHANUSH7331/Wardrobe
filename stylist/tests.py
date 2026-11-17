@@ -1063,6 +1063,53 @@ class ImageAnalyzerTests(TestCase):
             fallback_request.full_url,
         )
 
+    def test_gemini_read_timeout_uses_the_flash_lite_fallback(self):
+        response_body = {
+            'candidates': [
+                {
+                    'content': {
+                        'parts': [
+                            {
+                                'text': json.dumps(
+                                    {
+                                        'name': 'White shirt',
+                                        'category': 'shirt',
+                                        'primary_color': 'White',
+                                    }
+                                )
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    'GEMINI_API_KEY': 'test-key',
+                    'GEMINI_MODEL': 'gemini-3.8-flash',
+                },
+            ),
+            patch(
+                'stylist.services.gemini_api.urlopen',
+                side_effect=[
+                    TimeoutError('The read operation timed out'),
+                    BytesIO(json.dumps(response_body).encode('utf-8')),
+                ],
+            ) as urlopen_mock,
+        ):
+            result = analyze_clothing(self.make_image())
+
+        self.assertEqual(result['name'], 'White shirt')
+        self.assertEqual(urlopen_mock.call_count, 2)
+        fallback_request = urlopen_mock.call_args_list[1].args[0]
+        self.assertIn(
+            '/models/gemini-3.5-flash-lite:generateContent',
+            fallback_request.full_url,
+        )
+
     def test_gemini_connection_failure_includes_safe_network_cause(self):
         with (
             patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
