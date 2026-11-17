@@ -104,8 +104,12 @@ def generate_content(
             + (f' Details: {detail}' if detail else '')
         ) from error
     except (URLError, TimeoutError) as error:
+        reason = getattr(error, 'reason', error)
+        detail = ' '.join(str(reason).split())[:200]
         raise GeminiAPIError(
-            'Gemini could not be reached. Check the connection and try again.',
+            'Gemini could not be reached'
+            + (f' ({detail})' if detail else '')
+            + '. Check the connection and try again.',
             retryable=True,
         ) from error
     except (json.JSONDecodeError, UnicodeDecodeError) as error:

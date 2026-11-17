@@ -2,7 +2,7 @@ import json
 import os
 from io import BytesIO
 from tempfile import TemporaryDirectory
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from unittest.mock import patch
 
 from PIL import Image
@@ -1008,3 +1008,17 @@ class ImageAnalyzerTests(TestCase):
         self.assertTrue(error.exception.retryable)
         self.assertEqual(error.exception.retry_after, 3.0)
         self.assertIn('Quota exceeded', str(error.exception))
+
+    def test_gemini_connection_failure_includes_safe_network_cause(self):
+        with (
+            patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}),
+            patch(
+                'stylist.services.gemini_api.urlopen',
+                side_effect=URLError('Temporary DNS failure'),
+            ),
+        ):
+            with self.assertRaises(ImageAnalysisError) as error:
+                analyze_clothing(self.make_image())
+
+        self.assertTrue(error.exception.retryable)
+        self.assertIn('Temporary DNS failure', str(error.exception))
